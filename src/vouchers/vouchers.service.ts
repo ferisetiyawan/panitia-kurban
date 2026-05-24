@@ -91,6 +91,10 @@ export class VouchersService {
       'Status',
       'Tgl Distribusi',
       'Dibuat Oleh',
+      'Cluster Pickup',
+      'Unit Pickup',
+      'No HP Pickup',
+      'Tgl Pickup',
       'Diklaim Oleh',
       'Tgl Klaim',
     ].join(',');
@@ -104,6 +108,10 @@ export class VouchersService {
           ? new Date(v.distributionDate).toISOString().split('T')[0]
           : '',
         v.createdBy?.fullName || '',
+        v.pickupCluster || '',
+        v.pickupUnit || '',
+        v.pickupPhone || '',
+        v.pickedUpAt ? new Date(v.pickedUpAt).toISOString() : '',
         v.claimedBy?.fullName || '',
         v.claimedAt ? new Date(v.claimedAt).toISOString() : '',
       ]
