@@ -198,7 +198,7 @@ export class VouchersService {
   async scan(
     voucherCode: string,
     userId: string,
-  ): Promise<{ voucher: Voucher; message: string }> {
+  ): Promise<{ voucher: Voucher; message: string; pickupInfo?: string }> {
     let voucher: Voucher;
     try {
       voucher = await this.findByCode(voucherCode);

@@ -56,8 +56,8 @@ export class Voucher {
   @Column({ name: 'pickup_unit', nullable: true })
   pickupUnit: string;
 
-  @Column({ name: 'pickup_phone', nullable: true })
-  pickupPhone: string;
+  @Column({ name: 'pickup_phone', type: 'varchar', nullable: true })
+  pickupPhone: string | null;
 
   @Column({ name: 'picked_up_at', type: 'timestamp', nullable: true })
   pickedUpAt: Date;
