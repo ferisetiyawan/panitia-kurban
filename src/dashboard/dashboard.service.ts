@@ -52,6 +52,10 @@ export class DashboardService {
       .clone()
       .andWhere('v.status = :status', { status: VoucherStatus.CANCELLED })
       .getCount();
+    const distributedVouchers = await voucherQb
+      .clone()
+      .andWhere('v.status = :status', { status: VoucherStatus.DISTRIBUTED })
+      .getCount();
 
     const totalUsers = await this.usersRepo.count({
       where: { isActive: true },
@@ -87,6 +91,7 @@ export class DashboardService {
       claimedVouchers,
       activeVouchers,
       cancelledVouchers,
+      distributedVouchers,
       totalUsers,
       totalPengkurban,
       totalEvents,

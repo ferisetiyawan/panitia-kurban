@@ -64,6 +64,14 @@
         <button class="btn-primary w-full mt-4" onclick="resetScanner()">Scan Lagi</button>
       </div>
 
+      <!-- Link to pickup scanner -->
+      <div class="glass-card p-4 mb-4 text-center">
+        <p class="text-sm text-emerald-300/60 mb-2">Mau mencatat pengambilan kupon oleh warga?</p>
+        <a href="/scanner-pickup.html" class="btn-secondary inline-flex items-center gap-2">
+          📦 Scanner Pickup Kupon
+        </a>
+      </div>
+
       <!-- Recent scans -->
       <div class="glass-card p-4">
         <h3 class="font-semibold text-emerald-200 mb-3 text-sm">Riwayat Scan</h3>
@@ -153,6 +161,9 @@
           method: 'POST',
           body: JSON.stringify({ voucherCode: code })
         });
+        const pickupLine = result.pickupInfo
+          ? `<div class="flex justify-between py-1 text-xs"><span class="text-emerald-300/50">Pickup:</span><span class="text-emerald-300/70">${result.pickupInfo}</span></div>`
+          : '';
         resultDiv.innerHTML = `
           <div class="scan-success-icon">
             <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
@@ -161,7 +172,8 @@
           <p class="text-emerald-300/60 mb-4">${result.message}</p>
           <div class="glass-card p-4 text-left">
             <div class="flex justify-between py-1"><span class="text-emerald-300/50">Kode:</span><span class="font-mono font-bold">${result.voucher.voucherCode}</span></div>
-            <div class="flex justify-between py-1"><span class="text-emerald-300/50">Status:</span><span class="badge badge-claimed">DIKLAIM</span></div>
+            <div class="flex justify-between py-1"><span class="text-emerald-300/50">Status:</span><span class="badge badge-claimed">DIKLAIMED</span></div>
+            ${pickupLine}
           </div>
         `;
         addToHistory(code, true, result.message);

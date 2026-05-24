@@ -55,6 +55,13 @@
         <div class="stat-label">Belum Diklaim</div>
       </div>
       <div class="stat-card">
+        <div class="stat-number" id="stat-distributed" style="background: linear-gradient(135deg, #fbbf24, #f59e0b); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">-</div>
+        <div class="stat-label">Sudah Diambil</div>
+        <div class="stat-sub">voucher pickup</div>
+      </div>
+    </div>
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+      <div class="stat-card">
         <div class="stat-number" id="stat-pengkurban" style="background: linear-gradient(135deg, #c4b5fd, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">-</div>
         <div class="stat-label">Pengkurban</div>
       </div>
@@ -147,6 +154,7 @@
         document.getElementById('stat-total').textContent = stats.totalVouchers;
         document.getElementById('stat-claimed').textContent = stats.claimedVouchers;
         document.getElementById('stat-active').textContent = stats.activeVouchers;
+        document.getElementById('stat-distributed').textContent = stats.distributedVouchers ?? 0;
         document.getElementById('stat-pengkurban').textContent = stats.totalPengkurban;
         document.getElementById('progress-text').textContent = stats.claimPercentage + '%';
         document.getElementById('progress-fill').style.width = stats.claimPercentage + '%';

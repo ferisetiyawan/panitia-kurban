@@ -50,6 +50,25 @@ export class Voucher {
   @Column({ name: 'claimed_at', type: 'timestamp', nullable: true })
   claimedAt: Date;
 
+  @Column({ name: 'pickup_cluster', nullable: true })
+  pickupCluster: string;
+
+  @Column({ name: 'pickup_unit', nullable: true })
+  pickupUnit: string;
+
+  @Column({ name: 'pickup_phone', type: 'varchar', nullable: true })
+  pickupPhone: string | null;
+
+  @Column({ name: 'picked_up_at', type: 'timestamp', nullable: true })
+  pickedUpAt: Date;
+
+  @Column({ name: 'picked_up_by', nullable: true })
+  pickedUpById: string;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'picked_up_by' })
+  pickedUpBy: User;
+
   @Column({ name: 'created_by', nullable: true })
   createdById: string;
 

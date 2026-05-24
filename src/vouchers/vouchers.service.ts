@@ -91,6 +91,10 @@ export class VouchersService {
       'Status',
       'Tgl Distribusi',
       'Dibuat Oleh',
+      'Cluster Pickup',
+      'Unit Pickup',
+      'No HP Pickup',
+      'Tgl Pickup',
       'Diklaim Oleh',
       'Tgl Klaim',
     ].join(',');
@@ -104,6 +108,10 @@ export class VouchersService {
           ? new Date(v.distributionDate).toISOString().split('T')[0]
           : '',
         v.createdBy?.fullName || '',
+        v.pickupCluster || '',
+        v.pickupUnit || '',
+        v.pickupPhone || '',
+        v.pickedUpAt ? new Date(v.pickedUpAt).toISOString() : '',
         v.claimedBy?.fullName || '',
         v.claimedAt ? new Date(v.claimedAt).toISOString() : '',
       ]
@@ -190,7 +198,7 @@ export class VouchersService {
   async scan(
     voucherCode: string,
     userId: string,
-  ): Promise<{ voucher: Voucher; message: string }> {
+  ): Promise<{ voucher: Voucher; message: string; pickupInfo?: string }> {
     let voucher: Voucher;
     try {
       voucher = await this.findByCode(voucherCode);
@@ -219,6 +227,19 @@ export class VouchersService {
       throw new BadRequestException('Voucher sudah dibatalkan');
     }
 
+    // Build pickup info before claiming (read fields before they're cleared)
+    let pickupInfo: string | undefined;
+    if (voucher.pickupCluster) {
+      const dateStr = voucher.pickedUpAt
+        ? new Date(voucher.pickedUpAt).toLocaleDateString('id-ID', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+          })
+        : '-';
+      pickupInfo = `Diambil oleh ${voucher.pickupCluster} ${voucher.pickupUnit || ''} pada ${dateStr}`.trim();
+    }
+
     // Claim the voucher
     voucher.status = VoucherStatus.CLAIMED;
     voucher.claimedById = userId;
@@ -236,7 +257,72 @@ export class VouchersService {
     // Notify connected clients (Dashboard)
     this.vouchersGateway.notifyVoucherClaimed({ voucherCode });
 
-    return { voucher: saved, message: 'Voucher berhasil diklaim!' };
+    return { voucher: saved, message: 'Voucher berhasil diklaim!', pickupInfo };
+  }
+
+  async scanPickup(
+    voucherCode: string,
+    userId: string,
+    pickupCluster: string,
+    pickupUnit: string,
+    pickupPhone: string | undefined,
+  ): Promise<{ voucher: Voucher; message: string }> {
+    let voucher: Voucher;
+    try {
+      voucher = await this.findByCode(voucherCode);
+    } catch {
+      throw new NotFoundException('Voucher tidak ditemukan');
+    }
+
+    if (voucher.status === VoucherStatus.DISTRIBUTED) {
+      await this.scanLogsRepository.save({
+        voucherId: voucher.id,
+        scannedById: userId,
+        action: 'REJECTED',
+        notes: 'Voucher sudah diambil sebelumnya',
+      });
+      throw new BadRequestException('Voucher sudah diambil sebelumnya');
+    }
+
+    if (voucher.status === VoucherStatus.CLAIMED) {
+      await this.scanLogsRepository.save({
+        voucherId: voucher.id,
+        scannedById: userId,
+        action: 'REJECTED',
+        notes: 'Voucher sudah diklaim di hari H',
+      });
+      throw new BadRequestException('Voucher sudah diklaim di hari H');
+    }
+
+    if (voucher.status === VoucherStatus.CANCELLED) {
+      await this.scanLogsRepository.save({
+        voucherId: voucher.id,
+        scannedById: userId,
+        action: 'REJECTED',
+        notes: 'Voucher sudah dibatalkan',
+      });
+      throw new BadRequestException('Voucher sudah dibatalkan');
+    }
+
+    voucher.status = VoucherStatus.DISTRIBUTED;
+    voucher.pickupCluster = pickupCluster;
+    voucher.pickupUnit = pickupUnit;
+    voucher.pickupPhone = pickupPhone ?? null;
+    voucher.pickedUpAt = new Date();
+    voucher.pickedUpById = userId;
+    const saved = await this.vouchersRepository.save(voucher);
+
+    await this.scanLogsRepository.save({
+      voucherId: voucher.id,
+      scannedById: userId,
+      action: 'PICKUP',
+      notes: `Voucher diambil oleh ${pickupCluster} ${pickupUnit}`,
+    });
+
+    return {
+      voucher: saved,
+      message: 'Voucher berhasil dicatat sebagai sudah diambil',
+    };
   }
 
   async generateBatchPdf(eventId: string): Promise<Buffer> {
@@ -646,7 +732,12 @@ export class VouchersService {
       .andWhere('v.status = :status', { status: VoucherStatus.CANCELLED })
       .getCount();
 
-    return { total, claimed, active, cancelled };
+    const distributed = await qb
+      .clone()
+      .andWhere('v.status = :status', { status: VoucherStatus.DISTRIBUTED })
+      .getCount();
+
+    return { total, claimed, active, cancelled, distributed };
   }
 
   async getScanLogs(eventId?: string): Promise<ScanLog[]> {
