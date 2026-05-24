@@ -92,6 +92,7 @@
       <select id="status-filter" class="input-field" style="max-width:180px" onchange="loadVouchers()">
         <option value="">Semua Status</option>
         <option value="ACTIVE">Aktif</option>
+        <option value="DISTRIBUTED">Sudah Diambil</option>
         <option value="CLAIMED">Diklaim</option>
         <option value="CANCELLED">Dibatalkan</option>
       </select>
@@ -307,7 +308,11 @@
                 ${formatDate(v.distributionDate)}
               </span>
             </td>
-            <td><span class="badge badge-${v.status.toLowerCase()}">${v.status === 'ACTIVE' ? 'Aktif' : v.status === 'CLAIMED' ? 'Diklaim' : 'Batal'}</span></td>
+            <td><span class="badge badge-${v.status.toLowerCase()}">${
+              v.status === 'ACTIVE' ? 'Aktif' :
+              v.status === 'DISTRIBUTED' ? 'Diambil' :
+              v.status === 'CLAIMED' ? 'Diklaim' : 'Batal'
+            }</span></td>
             <td><div class="flex gap-1 flex-wrap">
               ${v.status === 'ACTIVE' ? `<button class="btn-danger btn-sm" onclick="deleteVoucher('${v.id}')">🗑</button>` : ''}
             </div></td>
