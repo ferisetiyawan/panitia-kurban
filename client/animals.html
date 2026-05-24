@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hewan Kurban - Panitia Kurban</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="bg-orb bg-orb-1"></div>
+  <div class="bg-orb bg-orb-2"></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <h1>🕌 Al Hijrah CGE</h1>
+      <p>Sistem Panitia Kurban</p>
+    </div>
+    <nav class="sidebar-nav"></nav>
+  </aside>
+  <nav class="bottom-nav" id="bottom-nav">
+    <div class="bottom-nav-items"></div>
+  </nav>
+
+  <main class="main-content">
+    <div class="top-bar">
+      <div class="flex items-center gap-3">
+        <button class="hamburger" onclick="toggleSidebar()">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+          </svg>
+        </button>
+        <h2 class="page-title">Hewan Kurban</h2>
+      </div>
+      <div id="user-info" class="user-info"></div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(16,185,129,0.15);">🐄</div>
+        <div>
+          <div class="stat-number" id="stat-total">-</div>
+          <div class="stat-label">Total Hewan</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(245,158,11,0.15);">⏳</div>
+        <div>
+          <div class="stat-number" id="stat-pending">-</div>
+          <div class="stat-label">Belum Diterima</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(16,185,129,0.15);">✅</div>
+        <div>
+          <div class="stat-number" id="stat-received">-</div>
+          <div class="stat-label">Sudah Diterima</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(99,102,241,0.15);">📷</div>
+        <div>
+          <div class="stat-number" id="stat-with-photos">-</div>
+          <div class="stat-label">Ada Foto</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="card mb-4">
+      <div class="flex flex-wrap gap-3 items-center justify-between">
+        <div class="flex flex-wrap gap-2 items-center">
+          <select id="filter-type" class="input-field" style="width: auto; min-width: 160px;" onchange="loadAnimals()">
+            <option value="">Semua Jenis</option>
+            <option value="DOMBA">Domba</option>
+            <option value="KAMBING">Kambing</option>
+            <option value="SAPI_PERORANGAN">Sapi Perorangan</option>
+            <option value="SAPI_KOLEKTIF_A">Sapi Kolektif A</option>
+            <option value="SAPI_KOLEKTIF_B">Sapi Kolektif B</option>
+            <option value="SAPI_KOLEKTIF_C">Sapi Kolektif C</option>
+          </select>
+          <select id="filter-status" class="input-field" style="width: auto; min-width: 140px;" onchange="loadAnimals()">
+            <option value="">Semua Status</option>
+            <option value="PENDING">Belum Diterima</option>
+            <option value="RECEIVED">Sudah Diterima</option>
+          </select>
+          <select id="filter-event" class="input-field" style="width: auto; min-width: 160px;" onchange="loadAnimals()">
+            <option value="">Semua Event</option>
+          </select>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button onclick="downloadPdf()" class="btn-secondary text-sm">
+            📄 Download Kartu PDF
+          </button>
+          <button onclick="showGenerateModal()" class="btn-primary text-sm" id="btn-generate">
+            ⚙️ Generate dari Registrasi
+          </button>
+          <button onclick="showVendorModal()" class="btn-secondary text-sm">
+            ➕ Tambah Hewan Vendor
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bulk bar -->
+    <div id="bulk-bar" class="bulk-bar mb-4" style="display:none; background: rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); border-radius:12px; padding:10px 16px; align-items:center; gap:12px; flex-wrap:wrap;">
+      <span class="count" id="bulk-count" style="font-weight:700; color:#6ee7b7; font-size:14px;">0 dipilih</span>
+      <button onclick="downloadSelectedPdf()" class="btn-secondary text-sm">📄 PDF Terpilih</button>
+      <button onclick="bulkDelete()" class="btn-danger text-sm">🗑 Hapus Terpilih</button>
+      <button onclick="clearSelection()" class="btn-secondary text-sm">✕ Batal</button>
+    </div>
+
+    <!-- Table -->
+    <div class="card">
+      <div style="overflow-x: auto;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="width:36px;"><input type="checkbox" id="check-all" onchange="toggleSelectAll()" style="accent-color:#10b981;"></th>
+              <th>Kode</th>
+              <th>Jenis</th>
+              <th>Sohibul Qurban</th>
+              <th>Status</th>
+              <th>Waktu Terima</th>
+              <th>Foto</th>
+              <th>Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="animals-tbody">
+            <tr><td colspan="8" class="text-center" style="color:#9ca3af; padding:40px;">Memuat data...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- Generate Modal -->
+  <div id="modal-generate" class="modal" style="display:none;">
+    <div class="modal-content">
+      <h3 class="modal-title">⚙️ Generate Kartu Hewan</h3>
+      <p style="color:#9ca3af; font-size:14px; margin-bottom:16px;">
+        Buat kartu hewan otomatis dari data registrasi pengkurban. Kartu kolektif (Sapi A/B/C) dibuat 1 per grup. Kartu perorangan (Kambing/Domba/Sapi Perorangan) dibuat 1 per pengkurban.
+      </p>
+      <div class="form-group">
+        <label>Event *</label>
+        <select id="gen-event-id" class="input-field">
+          <option value="">Pilih event...</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button onclick="closeModal('modal-generate')" class="btn-secondary">Batal</button>
+        <button onclick="doGenerate()" class="btn-primary">Generate</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Vendor Animal Modal -->
+  <div id="modal-vendor" class="modal" style="display:none;">
+    <div class="modal-content">
+      <h3 class="modal-title">➕ Tambah Hewan Vendor</h3>
+      <p style="color:#9ca3af; font-size:14px; margin-bottom:16px;">
+        Tambah hewan dari vendor yang tidak ada di daftar pengkurban (mis. hewan titipan / penambahan last-minute).
+      </p>
+      <div class="form-group">
+        <label>Event *</label>
+        <select id="vendor-event-id" class="input-field">
+          <option value="">Pilih event...</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Jenis Hewan *</label>
+        <select id="vendor-type" class="input-field">
+          <option value="">Pilih jenis...</option>
+          <option value="DOMBA">Domba</option>
+          <option value="KAMBING">Kambing</option>
+          <option value="SAPI_PERORANGAN">Sapi Perorangan</option>
+          <option value="SAPI_KOLEKTIF_A">Sapi Kolektif A</option>
+          <option value="SAPI_KOLEKTIF_B">Sapi Kolektif B</option>
+          <option value="SAPI_KOLEKTIF_C">Sapi Kolektif C</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Catatan</label>
+        <input type="text" id="vendor-notes" class="input-field" placeholder="Opsional — nama vendor, keterangan, dll">
+      </div>
+      <div class="modal-actions">
+        <button onclick="closeModal('modal-vendor')" class="btn-secondary">Batal</button>
+        <button onclick="doCreateVendor()" class="btn-primary">Tambah</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Receive Modal -->
+  <div id="modal-receive" class="modal" style="display:none;">
+    <div class="modal-content">
+      <h3 class="modal-title">✅ Tandai Diterima</h3>
+      <div id="receive-animal-info" style="background:rgba(16,185,129,0.1); border-radius:8px; padding:12px; margin-bottom:16px; font-size:14px;"></div>
+      <div class="form-group">
+        <label>Catatan (opsional)</label>
+        <input type="text" id="receive-notes" class="input-field" placeholder="Kondisi hewan, catatan penerimaan, dll">
+      </div>
+      <div class="modal-actions">
+        <button onclick="closeModal('modal-receive')" class="btn-secondary">Batal</button>
+        <button onclick="doReceive()" class="btn-primary">Tandai Diterima</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Photo Upload Modal -->
+  <div id="modal-photo" class="modal" style="display:none;">
+    <div class="modal-content">
+      <h3 class="modal-title">📷 Upload Foto</h3>
+      <div id="photo-animal-info" style="background:rgba(16,185,129,0.1); border-radius:8px; padding:12px; margin-bottom:16px; font-size:14px;"></div>
+      <div id="photo-grid" class="grid grid-cols-3 gap-2 mb-4" style="min-height:60px;"></div>
+      <div class="form-group">
+        <label>Pilih Foto</label>
+        <input type="file" id="photo-file" accept="image/*" class="input-field">
+      </div>
+      <div class="modal-actions">
+        <button onclick="closeModal('modal-photo')" class="btn-secondary">Tutup</button>
+        <button onclick="doUploadPhoto()" class="btn-primary">Upload</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/app.js"></script>
+  <script>
+    let currentAnimalId = null;
+    let selectedIds = new Set();
+    let allAnimals = [];
+
+    const TYPE_LABELS = {
+      DOMBA: 'Domba', KAMBING: 'Kambing', SAPI: 'Sapi',
+      SAPI_KOLEKTIF: 'Sapi Kolektif', SAPI_KOLEKTIF_A: 'Sapi Kolektif A',
+      SAPI_KOLEKTIF_B: 'Sapi Kolektif B', SAPI_KOLEKTIF_C: 'Sapi Kolektif C',
+      SAPI_PERORANGAN: 'Sapi Perorangan',
+    };
+
+    function typeLabel(t) { return TYPE_LABELS[t] || t; }
+
+    function statusBadge(status) {
+      if (status === 'RECEIVED')
+        return `<span class="badge badge-confirmed">✅ Diterima</span>`;
+      return `<span class="badge badge-pending">⏳ Belum Diterima</span>`;
+    }
+
+    async function loadEvents() {
+      const events = await api('/api/events');
+      const selects = ['filter-event', 'gen-event-id', 'vendor-event-id'];
+      selects.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        // keep first option
+        while (el.options.length > 1) el.remove(1);
+        events.forEach(e => {
+          const opt = document.createElement('option');
+          opt.value = e.id;
+          opt.textContent = e.name + (e.isActive ? ' (aktif)' : '');
+          if (e.isActive) opt.selected = (id === 'gen-event-id' || id === 'vendor-event-id');
+          el.appendChild(opt);
+        });
+      });
+    }
+
+    async function loadAnimals() {
+      const tbody = document.getElementById('animals-tbody');
+      tbody.innerHTML = '<tr><td colspan="8" style="color:#9ca3af; padding:24px; text-align:center;">Memuat...</td></tr>';
+
+      const params = new URLSearchParams();
+      const eventId = document.getElementById('filter-event').value;
+      const animalType = document.getElementById('filter-type').value;
+      const status = document.getElementById('filter-status').value;
+      if (eventId) params.set('eventId', eventId);
+      if (animalType) params.set('animalType', animalType);
+      if (status) params.set('status', status);
+
+      const animals = await api('/api/animals?' + params.toString());
+      allAnimals = animals;
+
+      // Stats
+      document.getElementById('stat-total').textContent = animals.length;
+      document.getElementById('stat-pending').textContent = animals.filter(a => a.status === 'PENDING').length;
+      document.getElementById('stat-received').textContent = animals.filter(a => a.status === 'RECEIVED').length;
+      document.getElementById('stat-with-photos').textContent = animals.filter(a => a.photos && a.photos.length > 0).length;
+
+      if (!animals.length) {
+        tbody.innerHTML = '<tr><td colspan="8" style="color:#9ca3af; padding:40px; text-align:center;">Belum ada data hewan. Klik "Generate dari Registrasi" untuk membuat kartu otomatis.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = animals.map(a => {
+        const names = (a.sohibulNames || []).join(', ') || '<span style="color:#6b7280;font-style:italic;">Hewan Vendor</span>';
+        const receivedAt = a.receivedAt ? new Date(a.receivedAt).toLocaleString('id-ID', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) : '-';
+        const photoCount = (a.photos || []).length;
+        return `
+          <tr>
+            <td><input type="checkbox" class="row-cb" value="${a.id}" onchange="onCbChange(this)" style="accent-color:#10b981;"></td>
+            <td><code style="font-size:11px; color:#10b981;">${a.animalCode}</code></td>
+            <td><span class="badge" style="background:rgba(99,102,241,0.15); color:#a5b4fc;">${a.animalLabel || typeLabel(a.animalType)}</span></td>
+            <td style="font-size:13px; max-width:200px;">${names}</td>
+            <td>${statusBadge(a.status)}</td>
+            <td style="font-size:12px; color:#9ca3af;">${receivedAt}</td>
+            <td style="font-size:12px; color:${photoCount > 0 ? '#10b981' : '#6b7280'};">${photoCount > 0 ? `📷 ${photoCount} foto` : '-'}</td>
+            <td>
+              <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                ${a.status === 'PENDING' ? `<button onclick="showReceiveModal('${a.id}', '${(a.animalLabel || typeLabel(a.animalType)).replace(/'/g,"\\'")}', '${a.animalCode}')" class="btn-primary text-xs">Terima</button>` : ''}
+                <button onclick="showPhotoModal('${a.id}', '${(a.animalLabel || typeLabel(a.animalType)).replace(/'/g,"\\'")}', '${a.animalCode}', ${JSON.stringify(a.photos || [])})" class="btn-secondary text-xs">Foto</button>
+                <button onclick="downloadOnePdf('${a.id}')" class="btn-secondary text-xs">PDF</button>
+                <button onclick="deleteAnimal('${a.id}')" class="btn-danger text-xs">Hapus</button>
+              </div>
+            </td>
+          </tr>`;
+      }).join('');
+    }
+
+    // Selection
+    function onCbChange(cb) {
+      if (cb.checked) selectedIds.add(cb.value);
+      else selectedIds.delete(cb.value);
+      updateBulkBar();
+    }
+    function toggleSelectAll() {
+      const all = document.getElementById('check-all').checked;
+      document.querySelectorAll('.row-cb').forEach(cb => {
+        cb.checked = all;
+        if (all) selectedIds.add(cb.value);
+        else selectedIds.delete(cb.value);
+      });
+      updateBulkBar();
+    }
+    function clearSelection() {
+      selectedIds.clear();
+      document.querySelectorAll('.row-cb').forEach(cb => cb.checked = false);
+      document.getElementById('check-all').checked = false;
+      updateBulkBar();
+    }
+    function updateBulkBar() {
+      const bar = document.getElementById('bulk-bar');
+      bar.style.display = selectedIds.size > 0 ? 'flex' : 'none';
+      document.getElementById('bulk-count').textContent = `${selectedIds.size} dipilih`;
+    }
+
+    // Modals
+    function showGenerateModal() {
+      document.getElementById('modal-generate').style.display = 'flex';
+    }
+    function showVendorModal() {
+      document.getElementById('vendor-event-id').value = '';
+      document.getElementById('vendor-type').value = '';
+      document.getElementById('vendor-notes').value = '';
+      document.getElementById('modal-vendor').style.display = 'flex';
+    }
+    function showReceiveModal(id, label, code) {
+      currentAnimalId = id;
+      document.getElementById('receive-animal-info').innerHTML =
+        `<strong>${label}</strong><br><code style="font-size:11px; color:#10b981;">${code}</code>`;
+      document.getElementById('receive-notes').value = '';
+      document.getElementById('modal-receive').style.display = 'flex';
+    }
+    function showPhotoModal(id, label, code, photos) {
+      currentAnimalId = id;
+      document.getElementById('photo-animal-info').innerHTML =
+        `<strong>${label}</strong> — <code style="font-size:11px; color:#10b981;">${code}</code>`;
+      const grid = document.getElementById('photo-grid');
+      grid.innerHTML = photos.length === 0
+        ? '<p style="color:#6b7280; font-size:13px; grid-column: span 3;">Belum ada foto</p>'
+        : photos.map(f => `<img src="/api/uploads/animal-photos/${f}" style="width:100%; aspect-ratio:1; object-fit:cover; border-radius:8px;">`).join('');
+      document.getElementById('photo-file').value = '';
+      document.getElementById('modal-photo').style.display = 'flex';
+    }
+    function closeModal(id) {
+      document.getElementById(id).style.display = 'none';
+    }
+
+    async function doGenerate() {
+      const eventId = document.getElementById('gen-event-id').value;
+      if (!eventId) return alert('Pilih event terlebih dahulu');
+      try {
+        const result = await api('/api/animals/generate', { method: 'POST', body: JSON.stringify({ eventId }) });
+        closeModal('modal-generate');
+        alert(result.message || `${result.created} kartu dibuat`);
+        loadAnimals();
+      } catch (e) { alert(e.message || 'Gagal generate'); }
+    }
+
+    async function doCreateVendor() {
+      const eventId = document.getElementById('vendor-event-id').value;
+      const animalType = document.getElementById('vendor-type').value;
+      const notes = document.getElementById('vendor-notes').value;
+      if (!eventId || !animalType) return alert('Event dan jenis hewan wajib diisi');
+      try {
+        await api('/api/animals/vendor', { method: 'POST', body: JSON.stringify({ eventId, animalType, notes }) });
+        closeModal('modal-vendor');
+        loadAnimals();
+      } catch (e) { alert(e.message || 'Gagal tambah hewan vendor'); }
+    }
+
+    async function doReceive() {
+      if (!currentAnimalId) return;
+      const notes = document.getElementById('receive-notes').value;
+      try {
+        await api(`/api/animals/${currentAnimalId}/receive`, { method: 'POST', body: JSON.stringify({ notes }) });
+        closeModal('modal-receive');
+        loadAnimals();
+      } catch (e) { alert(e.message || 'Gagal'); }
+    }
+
+    async function doUploadPhoto() {
+      if (!currentAnimalId) return;
+      const file = document.getElementById('photo-file').files[0];
+      if (!file) return alert('Pilih foto terlebih dahulu');
+      const form = new FormData();
+      form.append('photo', file);
+      const token = localStorage.getItem('token');
+      try {
+        const res = await fetch(`/api/animals/${currentAnimalId}/photo`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: form,
+        });
+        if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+        const updated = await res.json();
+        // refresh photo grid
+        showPhotoModal(currentAnimalId, '', '', updated.photos || []);
+        loadAnimals();
+      } catch (e) { alert(e.message || 'Gagal upload foto'); }
+    }
+
+    async function deleteAnimal(id) {
+      if (!confirm('Hapus kartu hewan ini?')) return;
+      try {
+        await api(`/api/animals/${id}`, { method: 'DELETE' });
+        loadAnimals();
+      } catch (e) { alert(e.message || 'Gagal hapus'); }
+    }
+
+    async function bulkDelete() {
+      if (!selectedIds.size) return;
+      if (!confirm(`Hapus ${selectedIds.size} hewan?`)) return;
+      try {
+        for (const id of selectedIds) {
+          await api(`/api/animals/${id}`, { method: 'DELETE' });
+        }
+        clearSelection();
+        loadAnimals();
+      } catch (e) { alert(e.message || 'Gagal hapus'); }
+    }
+
+    function getEventIdForPdf() {
+      return document.getElementById('filter-event').value || '';
+    }
+
+    async function downloadPdf() {
+      const eventId = getEventIdForPdf();
+      if (!eventId) return alert('Pilih event terlebih dahulu untuk download semua kartu');
+      window.open(`/api/animals/card-pdf?eventId=${eventId}`, '_blank');
+    }
+
+    function downloadSelectedPdf() {
+      if (!selectedIds.size) return;
+      const ids = [...selectedIds].join(',');
+      window.open(`/api/animals/card-pdf?ids=${ids}`, '_blank');
+    }
+
+    function downloadOnePdf(id) {
+      window.open(`/api/animals/card-pdf?ids=${id}`, '_blank');
+    }
+
+    // Close modals on backdrop click
+    ['modal-generate','modal-vendor','modal-receive','modal-photo'].forEach(id => {
+      document.getElementById(id).addEventListener('click', function(e) {
+        if (e.target === this) closeModal(id);
+      });
+    });
+
+    async function init() {
+      await requireAuth();
+      initSidebar('animals');
+      await loadEvents();
+      await loadAnimals();
+    }
+
+    init();
+  </script>
+</body>
+</html>

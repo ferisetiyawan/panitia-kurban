@@ -18,6 +18,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { NotificationsModule } from './common/notifications/notifications.module';
 import { RekapModule } from './rekap/rekap.module';
 import { FormResponsesModule } from './form-responses/form-responses.module';
+import { AnimalsModule } from './animals/animals.module';
 
 import { AppController } from './app.controller';
 
@@ -72,6 +73,7 @@ const isProduction = process.env.NODE_ENV === 'production';
     RekapModule,
     ScheduleModule.forRoot(),
     FormResponsesModule,
+    AnimalsModule,
   ],
   controllers: [AppController],
   providers: [
