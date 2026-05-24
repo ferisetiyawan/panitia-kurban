@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scanner Pickup Kupon - Panitia Kurban</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <link rel="manifest" href="/manifest.json">
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js');
+      });
+    }
+  </script>
+</head>
+<body>
+  <div class="bg-orb bg-orb-1"></div>
+  <div class="bg-orb bg-orb-2"></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo"><h1>🕌 Al Hijrah CGE</h1><p>Sistem Panitia Kurban</p></div>
+    <nav class="sidebar-nav"></nav>
+  </aside>
+  <nav class="bottom-nav" id="bottom-nav"><div class="bottom-nav-items"></div></nav>
+
+  <main class="main-content">
+    <div class="top-bar">
+      <div class="flex items-center gap-3">
+        <button class="hamburger" onclick="toggleSidebar()">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+          </svg>
+        </button>
+        <h2>Scanner Pickup Kupon</h2>
+      </div>
+      <div class="user-info" id="user-info"></div>
+    </div>
+
+    <div class="max-w-lg mx-auto">
+
+      <!-- State 1: Form penerima -->
+      <div id="form-section">
+        <div class="glass-card p-6 mb-4">
+          <div class="text-center mb-5">
+            <div class="text-4xl mb-2">📦</div>
+            <h3 class="font-bold text-emerald-200 text-lg">Pickup Kupon</h3>
+            <p class="text-sm text-emerald-300/60 mt-1">Catat siapa yang mengambil kupon</p>
+          </div>
+
+          <div class="space-y-4">
+            <div>
+              <label class="text-xs text-emerald-300/60 uppercase tracking-wider mb-1 block">Cluster *</label>
+              <select id="pickup-cluster" class="input-field w-full">
+                <option value="">— Pilih Cluster —</option>
+                <option value="MARGATA">Margata</option>
+                <option value="NAHARA">Nahara</option>
+                <option value="UENOS">Uenos</option>
+                <option value="LAINNYA">Lainnya</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs text-emerald-300/60 uppercase tracking-wider mb-1 block">Nomor Unit *</label>
+              <input type="text" id="pickup-unit" class="input-field w-full" placeholder="Contoh: 1/5 atau B3/12">
+            </div>
+            <div>
+              <label class="text-xs text-emerald-300/60 uppercase tracking-wider mb-1 block">Nomor HP <span class="text-emerald-300/30">(opsional)</span></label>
+              <input type="tel" id="pickup-phone" class="input-field w-full" placeholder="08xxxxxxxxxx">
+            </div>
+          </div>
+
+          <button class="btn-primary w-full mt-6" onclick="startSession()">
+            Mulai Sesi Pickup
+          </button>
+
+          <div class="mt-4 text-center">
+            <a href="/scanner.html" class="text-xs text-emerald-300/40 hover:text-emerald-300/60">
+              ← Kembali ke Scanner Hari H
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- State 2: Sesi aktif -->
+      <div id="session-section" style="display:none">
+
+        <!-- Session header -->
+        <div class="glass-card p-4 mb-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-xs text-emerald-300/50 uppercase tracking-wider">Sesi Aktif</div>
+              <div class="font-bold text-emerald-200 text-lg" id="session-label">-</div>
+              <div class="text-xs text-emerald-300/50" id="session-phone"></div>
+            </div>
+            <div class="text-right">
+              <div class="text-3xl font-bold text-emerald-400" id="session-count">0</div>
+              <div class="text-xs text-emerald-300/50">voucher diambil</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scan results list -->
+        <div class="glass-card p-4 mb-4" id="scan-list-card" style="display:none">
+          <h4 class="text-xs text-emerald-300/50 uppercase tracking-wider mb-3">Voucher Diambil</h4>
+          <div id="scan-list" class="space-y-2"></div>
+        </div>
+
+        <!-- Scanner -->
+        <div class="glass-card p-6 mb-4">
+          <h3 class="text-center font-semibold text-emerald-200 mb-4">Arahkan kamera ke QR Code voucher</h3>
+          <div class="scanner-container mb-4">
+            <div id="qr-reader" style="width:100%"></div>
+          </div>
+          <div class="flex gap-3 justify-center">
+            <button class="btn-primary" id="start-btn" onclick="startScanner()">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+              </svg>
+              Mulai Scan
+            </button>
+            <button class="btn-secondary" id="stop-btn" onclick="stopScanner()" style="display:none">Stop</button>
+          </div>
+          <!-- Manual input -->
+          <div class="mt-4 pt-4 border-t border-white/10">
+            <p class="text-xs text-emerald-300/40 text-center mb-2">Atau masukkan kode manual:</p>
+            <div class="flex gap-2">
+              <input type="text" id="manual-code" class="input-field" placeholder="QRB-1447H-...">
+              <button class="btn-primary" onclick="manualPickup()">Catat</button>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn-secondary w-full" onclick="endSession()">
+          Selesai / Ganti Penerima
+        </button>
+      </div>
+
+    </div>
+  </main>
+
+  <script src="/js/app.js"></script>
+  <script>
+    if (!requireAuth()) throw new Error('Not authenticated');
+    initSidebar('scanner');
+
+    let html5QrCode = null;
+    let isScanning = false;
+    let sessionCluster = '';
+    let sessionUnit = '';
+    let sessionPhone = '';
+    let sessionScans = [];
+    let isProcessing = false;
+
+    const CLUSTER_LABELS = {
+      MARGATA: 'Margata',
+      NAHARA: 'Nahara',
+      UENOS: 'Uenos',
+      LAINNYA: 'Lainnya',
+    };
+
+    function startSession() {
+      const cluster = document.getElementById('pickup-cluster').value;
+      const unit = document.getElementById('pickup-unit').value.trim();
+      const phone = document.getElementById('pickup-phone').value.trim();
+
+      if (!cluster) { showToast('Pilih cluster terlebih dahulu', 'error'); return; }
+      if (!unit) { showToast('Nomor unit wajib diisi', 'error'); return; }
+
+      sessionCluster = cluster;
+      sessionUnit = unit;
+      sessionPhone = phone;
+      sessionScans = [];
+
+      document.getElementById('session-label').textContent =
+        `${CLUSTER_LABELS[cluster] || cluster} ${unit}`;
+      document.getElementById('session-phone').textContent =
+        phone ? `📱 ${phone}` : '';
+      document.getElementById('session-count').textContent = '0';
+      document.getElementById('scan-list-card').style.display = 'none';
+      document.getElementById('scan-list').innerHTML = '';
+
+      document.getElementById('form-section').style.display = 'none';
+      document.getElementById('session-section').style.display = 'block';
+
+      startScanner();
+    }
+
+    function endSession() {
+      stopScanner();
+      document.getElementById('session-section').style.display = 'none';
+      document.getElementById('form-section').style.display = 'block';
+    }
+
+    function startScanner() {
+      if (isScanning) return;
+      html5QrCode = new Html5Qrcode('qr-reader');
+      html5QrCode.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        onScanSuccess,
+        () => {}
+      ).then(() => {
+        isScanning = true;
+        document.getElementById('start-btn').style.display = 'none';
+        document.getElementById('stop-btn').style.display = 'inline-flex';
+      }).catch(err => {
+        showToast('Tidak dapat mengakses kamera: ' + err, 'error');
+      });
+    }
+
+    function stopScanner() {
+      if (html5QrCode && isScanning) {
+        html5QrCode.stop().then(() => {
+          isScanning = false;
+          document.getElementById('start-btn').style.display = 'inline-flex';
+          document.getElementById('stop-btn').style.display = 'none';
+        }).catch(() => {});
+      }
+    }
+
+    async function onScanSuccess(decodedText) {
+      if (isProcessing) return;
+      isProcessing = true;
+
+      let voucherCode = decodedText;
+      try {
+        const parsed = JSON.parse(decodedText);
+        if (parsed.code) voucherCode = parsed.code;
+      } catch (e) { /* raw text */ }
+
+      await pickupVoucher(voucherCode);
+      isProcessing = false;
+    }
+
+    async function manualPickup() {
+      const code = document.getElementById('manual-code').value.trim();
+      if (!code) { showToast('Masukkan kode voucher', 'error'); return; }
+      document.getElementById('manual-code').value = '';
+      await pickupVoucher(code);
+    }
+
+    async function pickupVoucher(code) {
+      // Prevent duplicate in same session
+      if (sessionScans.find(s => s.code === code && s.success)) {
+        showToast(`Voucher ${code} sudah dicatat dalam sesi ini`, 'error');
+        return;
+      }
+
+      try {
+        const result = await api('/vouchers/scan-pickup', {
+          method: 'POST',
+          body: JSON.stringify({
+            voucherCode: code,
+            pickupCluster: sessionCluster,
+            pickupUnit: sessionUnit,
+            pickupPhone: sessionPhone || undefined,
+          }),
+        });
+
+        sessionScans.unshift({ code, success: true, time: new Date(), message: result.message });
+        updateSessionUI();
+        showToast(`✅ ${code} berhasil dicatat`);
+
+      } catch (err) {
+        sessionScans.unshift({ code, success: false, time: new Date(), message: err.message });
+        updateSessionUI();
+        showToast(err.message, 'error');
+      }
+    }
+
+    function updateSessionUI() {
+      const successCount = sessionScans.filter(s => s.success).length;
+      document.getElementById('session-count').textContent = successCount;
+
+      if (sessionScans.length > 0) {
+        document.getElementById('scan-list-card').style.display = 'block';
+      }
+
+      document.getElementById('scan-list').innerHTML = sessionScans.slice(0, 20).map(s => `
+        <div class="flex items-center justify-between p-2 rounded-lg ${s.success ? 'bg-emerald-900/30' : 'bg-red-900/20'}">
+          <div>
+            <span class="font-mono text-sm ${s.success ? 'text-emerald-300' : 'text-red-300'}">${s.code}</span>
+            <span class="text-xs text-emerald-300/30 ml-2">${s.time.toLocaleTimeString('id-ID')}</span>
+          </div>
+          <span class="text-xs ${s.success ? 'text-emerald-400' : 'text-red-400'}">${s.success ? '✅' : '❌'}</span>
+        </div>
+      `).join('');
+    }
+  </script>
+</body>
+</html>
