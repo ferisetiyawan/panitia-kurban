@@ -1,5 +1,6 @@
 export enum VoucherStatus {
   ACTIVE = 'ACTIVE',
+  DISTRIBUTED = 'DISTRIBUTED',
   CLAIMED = 'CLAIMED',
   CANCELLED = 'CANCELLED',
 }
