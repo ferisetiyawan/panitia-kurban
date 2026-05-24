@@ -182,6 +182,38 @@ export class VouchersController {
     return this.vouchersService.scan(body.voucherCode, req.user.id);
   }
 
+  @Post('scan-pickup')
+  @Roles(Role.SUPER_ADMIN, Role.KETUA_PANITIA, Role.PANITIA_SCANNER)
+  scanPickup(
+    @Body()
+    body: {
+      voucherCode: string;
+      pickupCluster: string;
+      pickupUnit: string;
+      pickupPhone?: string;
+    },
+    @Request() req: any,
+  ) {
+    if (!body.voucherCode || !body.pickupCluster || !body.pickupUnit) {
+      throw new BadRequestException(
+        'voucherCode, pickupCluster, dan pickupUnit wajib diisi',
+      );
+    }
+    const validClusters = ['MARGATA', 'NAHARA', 'UENOS', 'LAINNYA'];
+    if (!validClusters.includes(body.pickupCluster)) {
+      throw new BadRequestException(
+        `pickupCluster harus salah satu dari: ${validClusters.join(', ')}`,
+      );
+    }
+    return this.vouchersService.scanPickup(
+      body.voucherCode,
+      req.user.id,
+      body.pickupCluster,
+      body.pickupUnit,
+      body.pickupPhone,
+    );
+  }
+
   @Delete(':id')
   @Roles(Role.SUPER_ADMIN, Role.KETUA_PANITIA, Role.PANITIA_VOUCHER)
   remove(@Param('id') id: string) {
