@@ -20,6 +20,7 @@ describe('FormResponsesService.syncFromSheet', () => {
     const sheetsMock = { readRange: jest.fn() };
     const formRepoMock = {
       upsert: jest.fn(),
+      findOne: jest.fn(),
     };
     const pengkurbanRepoMock = { findOne: jest.fn() };
 
@@ -28,24 +29,27 @@ describe('FormResponsesService.syncFromSheet', () => {
         FormResponsesService,
         { provide: SheetsClient, useValue: sheetsMock },
         { provide: getRepositoryToken(FormResponse), useValue: formRepoMock },
-        { provide: getRepositoryToken(Pengkurban), useValue: pengkurbanRepoMock },
+        {
+          provide: getRepositoryToken(Pengkurban),
+          useValue: pengkurbanRepoMock,
+        },
       ],
     }).compile();
 
     service = module.get<FormResponsesService>(FormResponsesService);
-    sheets = module.get(SheetsClient) as jest.Mocked<SheetsClient>;
-    formRepo = module.get(getRepositoryToken(FormResponse)) as jest.Mocked<
-      Repository<FormResponse>
-    >;
-    pengkurbanRepo = module.get(getRepositoryToken(Pengkurban)) as jest.Mocked<
-      Repository<Pengkurban>
-    >;
+    sheets = module.get(SheetsClient);
+    formRepo = module.get(getRepositoryToken(FormResponse));
+    pengkurbanRepo = module.get(getRepositoryToken(Pengkurban));
   });
 
   it('upserts row when pengkurban exists', async () => {
     sheets.readRange.mockResolvedValue([
       ['Timestamp', 'Nama Sohibul Qurban', 'Pilihan'],
-      ['2026-05-19 14:23:45', 'Sohibul Test (REG-2026-0001)', '1/3 (sepertiga)'],
+      [
+        '2026-05-19 14:23:45',
+        'Sohibul Test (REG-2026-0001)',
+        '1/3 (sepertiga)',
+      ],
     ]);
     pengkurbanRepo.findOne.mockResolvedValue({ id: 'uuid-1' } as Pengkurban);
     formRepo.upsert.mockResolvedValue({} as any);
@@ -76,7 +80,9 @@ describe('FormResponsesService.syncFromSheet', () => {
     const summary = await service.syncFromSheet(formKey, sheetId, range);
 
     expect(summary.skipped).toHaveLength(1);
-    expect(summary.skipped[0]).toMatchObject({ reason: expect.stringMatching(/REG/i) });
+    expect(summary.skipped[0]).toMatchObject({
+      reason: expect.stringMatching(/REG/i),
+    });
     expect(pengkurbanRepo.findOne).not.toHaveBeenCalled();
   });
 
@@ -119,7 +125,7 @@ describe('FormResponsesService.syncFromSheet', () => {
 
     const summary = await service.syncFromSheet(formKey, sheetId, range);
 
-    expect(summary).toEqual({ synced: 0, skipped: [], errors: [] });
+    expect(summary).toEqual({ synced: 0, skipped: [], errors: [], newRegs: [] });
   });
 
   it('records error per row when mapping throws (e.g., invalid timestamp)', async () => {

@@ -10,6 +10,12 @@ export interface SyncSummary {
   synced: number;
   skipped: Array<{ row?: string[]; reg?: string; reason: string }>;
   errors: Array<{ row: string[]; error: string }>;
+  /**
+   * Registration numbers of pengkurban whose form response was INSERTED for the
+   * first time this run (not upsert-updated). Empty if nothing new. Used to
+   * trigger event-driven notif (mis. WA "X baru isi") downstream.
+   */
+  newRegs: string[];
 }
 
 @Injectable()
@@ -33,6 +39,7 @@ export class FormResponsesService {
       synced: 0,
       skipped: [],
       errors: [],
+      newRegs: [],
     };
 
     const rows = await this.sheets.readRange(sheetId, range);
@@ -81,10 +88,20 @@ export class FormResponsesService {
           formSubmittedAt,
         };
 
+        // Track whether this is a new INSERT vs update. upsert() doesn't tell
+        // us, so peek the table first. Cheap — already indexed on (pengkurbanId, formKey).
+        const existing = await this.formRepo.findOne({
+          where: { pengkurbanId: pengkurban.id, formKey },
+          select: ['id'],
+        });
+
         await this.formRepo.upsert(payload, {
           conflictPaths: ['pengkurbanId', 'formKey'],
         });
         summary.synced++;
+        if (!existing) {
+          summary.newRegs.push(reg);
+        }
       } catch (e) {
         const err = e as Error;
         console.error('[form-responses sync]', err.stack || err.message);
