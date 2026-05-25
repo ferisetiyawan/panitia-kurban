@@ -138,6 +138,30 @@
       </div>
 
     </div>
+
+    <!-- Scan result modal (pause + confirm before next scan) -->
+    <div class="modal-overlay" id="scan-result-modal">
+      <div class="modal-content" style="max-width: 380px;">
+        <div class="modal-body" style="text-align:center; padding: 28px 24px;">
+          <div id="scan-result-icon" style="font-size: 56px; line-height: 1; margin-bottom: 12px;">✅</div>
+          <div id="scan-result-title" style="font-size: 18px; font-weight: 700; color: #f0fdf4; margin-bottom: 6px;">Voucher Diterima</div>
+          <div id="scan-result-code" style="font-family: monospace; font-size: 14px; color: #6ee7b7; margin-bottom: 12px;">-</div>
+          <div id="scan-result-msg" style="font-size: 13px; color: #9ca3af; margin-bottom: 20px;"></div>
+          <div style="background: rgba(16,185,129,0.1); border-radius: 8px; padding: 10px; margin-bottom: 20px;">
+            <div style="font-size: 11px; color: #9ca3af;">Total voucher tercatat di sesi ini</div>
+            <div style="font-size: 28px; font-weight: 800; color: #10b981;" id="scan-result-count">0</div>
+          </div>
+          <div style="display:flex; gap: 8px;">
+            <button class="btn-primary" style="flex:1; padding:12px;" onclick="continueScan()">
+              📷 Scan Berikutnya
+            </button>
+            <button class="btn-secondary" style="flex:1; padding:12px;" onclick="finishFromModal()">
+              ✓ Selesai
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </main>
 
   <script src="/js/app.js"></script>
@@ -189,6 +213,8 @@
 
     function endSession() {
       stopScanner();
+      document.getElementById('scan-result-modal').classList.remove('active');
+      isProcessing = false;
       document.getElementById('session-section').style.display = 'none';
       document.getElementById('form-section').style.display = 'block';
     }
@@ -231,20 +257,30 @@
       } catch (e) { /* raw text */ }
 
       await pickupVoucher(voucherCode);
-      isProcessing = false;
+      // isProcessing dilepas saat user klik "Scan Berikutnya" (continueScan())
+      // atau saat session ditutup (endSession). Jangan reset di sini biar
+      // scanner ga retrigger sementara modal masih tampil.
     }
 
     async function manualPickup() {
+      if (isProcessing) return;
       const code = document.getElementById('manual-code').value.trim();
       if (!code) { showToast('Masukkan kode voucher', 'error'); return; }
+      isProcessing = true;
       document.getElementById('manual-code').value = '';
       await pickupVoucher(code);
+      // sama seperti onScanSuccess: dilepas via continueScan/endSession
     }
 
     async function pickupVoucher(code) {
-      // Prevent duplicate in same session
+      // Prevent duplicate in same session (mainly for manual input — scanner
+      // is paused after each scan via modal, so camera won't re-trigger).
       if (sessionScans.find(s => s.code === code && s.success)) {
-        showToast(`Voucher ${code} sudah dicatat dalam sesi ini`, 'error');
+        showScanResultModal({
+          success: false,
+          code,
+          message: `Voucher ${code} sudah dicatat dalam sesi ini`,
+        });
         return;
       }
 
@@ -261,13 +297,45 @@
 
         sessionScans.unshift({ code, success: true, time: new Date(), message: result.message });
         updateSessionUI();
-        showToast(`✅ ${code} berhasil dicatat`);
+        showScanResultModal({ success: true, code, message: result.message });
 
       } catch (err) {
         sessionScans.unshift({ code, success: false, time: new Date(), message: err.message });
         updateSessionUI();
-        showToast(err.message, 'error');
+        showScanResultModal({ success: false, code, message: err.message });
       }
+    }
+
+    function showScanResultModal({ success, code, message }) {
+      // Pause scanner so the camera doesn't re-trigger on the same QR
+      if (html5QrCode && isScanning) {
+        try { html5QrCode.pause(true); } catch (e) { /* noop */ }
+      }
+      const icon = document.getElementById('scan-result-icon');
+      const title = document.getElementById('scan-result-title');
+      const codeEl = document.getElementById('scan-result-code');
+      const msgEl = document.getElementById('scan-result-msg');
+      const countEl = document.getElementById('scan-result-count');
+      icon.textContent = success ? '✅' : '❌';
+      title.textContent = success ? 'Voucher Diterima' : 'Gagal';
+      title.style.color = success ? '#f0fdf4' : '#fca5a5';
+      codeEl.textContent = code;
+      msgEl.textContent = message || '';
+      countEl.textContent = sessionScans.filter(s => s.success).length;
+      document.getElementById('scan-result-modal').classList.add('active');
+    }
+
+    function continueScan() {
+      document.getElementById('scan-result-modal').classList.remove('active');
+      if (html5QrCode && isScanning) {
+        try { html5QrCode.resume(); } catch (e) { /* noop */ }
+      }
+      isProcessing = false;
+    }
+
+    function finishFromModal() {
+      document.getElementById('scan-result-modal').classList.remove('active');
+      endSession();
     }
 
     function updateSessionUI() {
