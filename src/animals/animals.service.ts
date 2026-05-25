@@ -398,7 +398,7 @@ export class AnimalsService {
         doc.font('Helvetica-Bold').fontSize(9).fillColor('#10b981');
         t('KARTU HEWAN QURBAN', L, headerY);
         doc.font('Helvetica').fontSize(8).fillColor('#6b7280');
-        t('Masjid Al Hijrah CGE', L, headerY + 13);
+        t('Panitia Qurban 1447 H CGE', L, headerY + 13);
 
         // Animal code (font diperbesar 11→18)
         const codeY = cardY + 50;
@@ -406,38 +406,42 @@ export class AnimalsService {
         doc.font('Helvetica-Bold').fontSize(18).fillColor('#166534');
         t(a.animalCode, L, codeY + 8, { width: 240, align: 'center' });
 
-        // Animal type label (font diperbesar 14→22)
+        // Animal type label (dikecilkan — udah jelas pas digantung ke hewan,
+        // ga perlu dominan; ruang dipakai untuk nama sohibul yg lebih penting)
         const typeY = codeY + 42;
-        doc.font('Helvetica-Bold').fontSize(22).fillColor('#1f2937');
+        doc.font('Helvetica-Bold').fontSize(13).fillColor('#6b7280');
         t(a.animalLabel, L, typeY);
 
-        // Sohibul names (status badge dihilangkan — PDF dicetak fisik, status ga relevan di kertas)
-        const namesY = typeY + 32;
-        doc.font('Helvetica-Bold').fontSize(9).fillColor('#6b7280');
+        // Sohibul names — yang paling penting, font paling gede
+        const namesY = typeY + 24;
+        doc.font('Helvetica-Bold').fontSize(10).fillColor('#6b7280');
         t('SOHIBUL QURBAN:', L, namesY);
         const names: string[] = a.sohibulNames || [];
         const NAMES_W = QR_X - L - 8; // available width before QR panel
         const NAMES_MAX_Y = cardY + CARD_H - 28; // leave room for received-info footer
+        const NAME_FONT_SIZE = 18;
+        const NAME_LINE_GAP = 4;
         if (names.length === 0) {
-          doc.font('Helvetica').fontSize(11).fillColor('#9ca3af');
-          t('(Hewan Vendor — tidak terdaftar)', L, namesY + 14);
+          doc.font('Helvetica').fontSize(NAME_FONT_SIZE).fillColor('#9ca3af');
+          t('(Hewan Vendor — tidak terdaftar)', L, namesY + 18);
         } else {
-          doc.font('Helvetica').fontSize(11).fillColor('#1f2937');
-          let cursorY = namesY + 14;
+          doc.font('Helvetica-Bold').fontSize(NAME_FONT_SIZE).fillColor('#1f2937');
+          let cursorY = namesY + 18;
           const toRender = names.slice(0, 7);
           for (let idx = 0; idx < toRender.length; idx++) {
             if (cursorY >= NAMES_MAX_Y) {
               const remaining = toRender.length - idx;
-              doc.font('Helvetica-Oblique').fontSize(9).fillColor('#6b7280');
+              doc.font('Helvetica-Oblique').fontSize(10).fillColor('#6b7280');
               doc.text(`+${remaining} lainnya`, L, cursorY, { width: NAMES_W, lineBreak: false });
               break;
             }
             doc.text(`${idx + 1}. ${toRender[idx]}`, L, cursorY, {
               width: NAMES_W,
-              lineGap: 2,
+              lineGap: NAME_LINE_GAP,
             });
-            cursorY = doc.y + 2;
-            doc.font('Helvetica').fontSize(11).fillColor('#1f2937'); // reset after potential overflow font switch
+            cursorY = doc.y + NAME_LINE_GAP;
+            // reset after potential overflow font switch
+            doc.font('Helvetica-Bold').fontSize(NAME_FONT_SIZE).fillColor('#1f2937');
           }
         }
 
