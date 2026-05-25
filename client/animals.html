@@ -450,20 +450,32 @@
       return document.getElementById('filter-event').value || '';
     }
 
+    async function openPdfBlob(endpoint) {
+      try {
+        const blob = await api(endpoint);
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      } catch (e) {
+        console.error('[pdf]', e);
+        alert(e.message || 'Gagal download PDF');
+      }
+    }
+
     async function downloadPdf() {
       const eventId = getEventIdForPdf();
       if (!eventId) return alert('Pilih event terlebih dahulu untuk download semua kartu');
-      window.open(`/api/animals/card-pdf?eventId=${eventId}`, '_blank');
+      await openPdfBlob(`/animals/card-pdf?eventId=${eventId}`);
     }
 
-    function downloadSelectedPdf() {
+    async function downloadSelectedPdf() {
       if (!selectedIds.size) return;
       const ids = [...selectedIds].join(',');
-      window.open(`/api/animals/card-pdf?ids=${ids}`, '_blank');
+      await openPdfBlob(`/animals/card-pdf?ids=${ids}`);
     }
 
-    function downloadOnePdf(id) {
-      window.open(`/api/animals/card-pdf?ids=${id}`, '_blank');
+    async function downloadOnePdf(id) {
+      await openPdfBlob(`/animals/card-pdf?ids=${id}`);
     }
 
     // Close modals on backdrop click
