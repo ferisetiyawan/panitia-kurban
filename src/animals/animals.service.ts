@@ -371,7 +371,7 @@ export class AnimalsService {
         const cardY =
           PADDING + slot * (CARD_H + CARD_GAP);
         const L = PADDING + 16;
-        const QR_PANEL_W = 120;
+        const QR_PANEL_W = 160; // diperlebar dari 120 supaya QR 140pt muat
         const QR_X = PADDING + CARD_W - QR_PANEL_W;
 
         // Card background
@@ -394,44 +394,51 @@ export class AnimalsService {
         doc.restore();
 
         // Header
-        const headerY = cardY + 16;
-        doc.font('Helvetica-Bold').fontSize(7).fillColor('#10b981');
+        const headerY = cardY + 18;
+        doc.font('Helvetica-Bold').fontSize(9).fillColor('#10b981');
         t('KARTU HEWAN QURBAN', L, headerY);
-        doc.font('Helvetica').fontSize(6.5).fillColor('#6b7280');
-        t('Masjid Al Hijrah CGE', L, headerY + 11);
+        doc.font('Helvetica').fontSize(8).fillColor('#6b7280');
+        t('Masjid Al Hijrah CGE', L, headerY + 13);
 
-        // Animal code
-        const codeY = cardY + 42;
-        doc.roundedRect(L, codeY, 200, 24, 4).fillAndStroke('#f0fdf4', '#86efac');
-        doc.font('Helvetica-Bold').fontSize(11).fillColor('#166534');
-        t(a.animalCode, L, codeY + 6, { width: 200, align: 'center' });
+        // Animal code (font diperbesar 11→18)
+        const codeY = cardY + 50;
+        doc.roundedRect(L, codeY, 240, 32, 5).fillAndStroke('#f0fdf4', '#86efac');
+        doc.font('Helvetica-Bold').fontSize(18).fillColor('#166534');
+        t(a.animalCode, L, codeY + 8, { width: 240, align: 'center' });
 
-        // Animal type label
-        const typeY = codeY + 32;
-        doc.font('Helvetica-Bold').fontSize(14).fillColor('#1f2937');
+        // Animal type label (font diperbesar 14→22)
+        const typeY = codeY + 42;
+        doc.font('Helvetica-Bold').fontSize(22).fillColor('#1f2937');
         t(a.animalLabel, L, typeY);
 
-        // Status badge
-        const statusColor = a.status === 'RECEIVED' ? '#16a34a' : '#f59e0b';
-        const statusBg = a.status === 'RECEIVED' ? '#dcfce7' : '#fef3c7';
-        const statusLabel = a.status === 'RECEIVED' ? 'Sudah Diterima' : 'Belum Diterima';
-        doc.roundedRect(L, typeY + 20, 90, 16, 4).fill(statusBg);
-        doc.font('Helvetica-Bold').fontSize(7).fillColor(statusColor);
-        t(statusLabel, L, typeY + 24, { width: 90, align: 'center' });
-
-        // Sohibul names
-        const namesY = typeY + 44;
-        doc.font('Helvetica-Bold').fontSize(7).fillColor('#6b7280');
+        // Sohibul names (status badge dihilangkan — PDF dicetak fisik, status ga relevan di kertas)
+        const namesY = typeY + 32;
+        doc.font('Helvetica-Bold').fontSize(9).fillColor('#6b7280');
         t('SOHIBUL QURBAN:', L, namesY);
         const names: string[] = a.sohibulNames || [];
+        const NAMES_W = QR_X - L - 8; // available width before QR panel
+        const NAMES_MAX_Y = cardY + CARD_H - 28; // leave room for received-info footer
         if (names.length === 0) {
-          doc.font('Helvetica').fontSize(8).fillColor('#9ca3af');
-          t('(Hewan Vendor — tidak terdaftar)', L, namesY + 11);
+          doc.font('Helvetica').fontSize(11).fillColor('#9ca3af');
+          t('(Hewan Vendor — tidak terdaftar)', L, namesY + 14);
         } else {
-          names.slice(0, 7).forEach((name: string, idx: number) => {
-            doc.font('Helvetica').fontSize(8.5).fillColor('#1f2937');
-            t(`${idx + 1}. ${name}`, L, namesY + 11 + idx * 12);
-          });
+          doc.font('Helvetica').fontSize(11).fillColor('#1f2937');
+          let cursorY = namesY + 14;
+          const toRender = names.slice(0, 7);
+          for (let idx = 0; idx < toRender.length; idx++) {
+            if (cursorY >= NAMES_MAX_Y) {
+              const remaining = toRender.length - idx;
+              doc.font('Helvetica-Oblique').fontSize(9).fillColor('#6b7280');
+              doc.text(`+${remaining} lainnya`, L, cursorY, { width: NAMES_W, lineBreak: false });
+              break;
+            }
+            doc.text(`${idx + 1}. ${toRender[idx]}`, L, cursorY, {
+              width: NAMES_W,
+              lineGap: 2,
+            });
+            cursorY = doc.y + 2;
+            doc.font('Helvetica').fontSize(11).fillColor('#1f2937'); // reset after potential overflow font switch
+          }
         }
 
         // Received info
@@ -446,19 +453,19 @@ export class AnimalsService {
           t(`Diterima: ${dateStr}`, L, recvY);
         }
 
-        // QR code panel
+        // QR code panel (QR diperbesar 80→140, panel diperlebar)
         doc.roundedRect(QR_X, cardY + 10, QR_PANEL_W, CARD_H - 20, 6).fill('#ecfdf5');
 
         const qrDataUrl = qrMap[a.id];
         if (qrDataUrl && qrDataUrl.includes(',')) {
           try {
             const qrBuffer = Buffer.from(qrDataUrl.split(',')[1], 'base64');
-            const QR_SIZE = 80;
+            const QR_SIZE = Math.min(QR_PANEL_W - 16, 140);
             const qrX = QR_X + (QR_PANEL_W - QR_SIZE) / 2;
-            const qrY = cardY + 10 + (CARD_H - 20 - QR_SIZE - 20) / 2;
+            const qrY = cardY + 10 + (CARD_H - 20 - QR_SIZE - 24) / 2;
             doc.image(qrBuffer, qrX, qrY, { width: QR_SIZE, height: QR_SIZE });
-            doc.font('Helvetica-Bold').fontSize(5).fillColor('#10b981');
-            t('SCAN KARTU HEWAN', QR_X, qrY + QR_SIZE + 6, {
+            doc.font('Helvetica-Bold').fontSize(8).fillColor('#10b981');
+            t('SCAN KARTU HEWAN', QR_X, qrY + QR_SIZE + 8, {
               width: QR_PANEL_W,
               align: 'center',
             });
