@@ -245,7 +245,7 @@
     }
 
     async function loadEvents() {
-      const events = await api('/api/events');
+      const events = await api('/events');
       const selects = ['filter-event', 'gen-event-id', 'vendor-event-id'];
       selects.forEach(id => {
         const el = document.getElementById(id);
@@ -274,7 +274,7 @@
       if (animalType) params.set('animalType', animalType);
       if (status) params.set('status', status);
 
-      const animals = await api('/api/animals?' + params.toString());
+      const animals = await api('/animals?' + params.toString());
       allAnimals = animals;
 
       // Stats
@@ -376,7 +376,7 @@
       const eventId = document.getElementById('gen-event-id').value;
       if (!eventId) return alert('Pilih event terlebih dahulu');
       try {
-        const result = await api('/api/animals/generate', { method: 'POST', body: JSON.stringify({ eventId }) });
+        const result = await api('/animals/generate', { method: 'POST', body: JSON.stringify({ eventId }) });
         closeModal('modal-generate');
         alert(result.message || `${result.created} kartu dibuat`);
         loadAnimals();
@@ -389,7 +389,7 @@
       const notes = document.getElementById('vendor-notes').value;
       if (!eventId || !animalType) return alert('Event dan jenis hewan wajib diisi');
       try {
-        await api('/api/animals/vendor', { method: 'POST', body: JSON.stringify({ eventId, animalType, notes }) });
+        await api('/animals/vendor', { method: 'POST', body: JSON.stringify({ eventId, animalType, notes }) });
         closeModal('modal-vendor');
         loadAnimals();
       } catch (e) { alert(e.message || 'Gagal tambah hewan vendor'); }
@@ -399,7 +399,7 @@
       if (!currentAnimalId) return;
       const notes = document.getElementById('receive-notes').value;
       try {
-        await api(`/api/animals/${currentAnimalId}/receive`, { method: 'POST', body: JSON.stringify({ notes }) });
+        await api(`/animals/${currentAnimalId}/receive`, { method: 'POST', body: JSON.stringify({ notes }) });
         closeModal('modal-receive');
         loadAnimals();
       } catch (e) { alert(e.message || 'Gagal'); }
@@ -429,7 +429,7 @@
     async function deleteAnimal(id) {
       if (!confirm('Hapus kartu hewan ini?')) return;
       try {
-        await api(`/api/animals/${id}`, { method: 'DELETE' });
+        await api(`/animals/${id}`, { method: 'DELETE' });
         loadAnimals();
       } catch (e) { alert(e.message || 'Gagal hapus'); }
     }
@@ -439,7 +439,7 @@
       if (!confirm(`Hapus ${selectedIds.size} hewan?`)) return;
       try {
         for (const id of selectedIds) {
-          await api(`/api/animals/${id}`, { method: 'DELETE' });
+          await api(`/animals/${id}`, { method: 'DELETE' });
         }
         clearSelection();
         loadAnimals();

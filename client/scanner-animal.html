@@ -142,7 +142,7 @@
     async function lookupCode(code) {
       showResult('<div style="text-align:center; padding:20px; color:#9ca3af;">Mencari...</div>');
       try {
-        const animal = await api(`/api/animals/scan/${encodeURIComponent(code)}`);
+        const animal = await api(`/animals/scan/${encodeURIComponent(code)}`);
         currentAnimal = animal;
         renderAnimalResult(animal);
       } catch (e) {
@@ -206,7 +206,7 @@
       if (!currentAnimal) return;
       const notes = document.getElementById('receive-notes')?.value || '';
       try {
-        const result = await api(`/api/animals/${currentAnimal.id}/receive`, {
+        const result = await api(`/animals/${currentAnimal.id}/receive`, {
           method: 'POST',
           body: JSON.stringify({ notes })
         });
