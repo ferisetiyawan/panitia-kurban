@@ -79,13 +79,18 @@ export class AnimalsService {
   private async getSohibulNames(animal: Animal): Promise<string[]> {
     if (animal.isVendorAnimal) return [];
 
+    // Flatten: shohibul_name bisa multi-baris (1 pengkurban listing 7 nama
+    // dalam 1 row). Split per newline biar render PDF / UI bisa nomori
+    // per nama individu.
+    const splitNames = (s: string): string[] =>
+      s.split('\n').map((n) => n.trim()).filter(Boolean);
+
     if (KOLEKTIF_TYPES.includes(animal.animalType)) {
-      // Query all pengkurban of this type for this event
       const list = await this.pengkurbanRepository.find({
         where: { eventId: animal.eventId, animalType: animal.animalType as any },
         select: ['id', 'name', 'shohibulName'],
       });
-      return list.map((p) => p.shohibulName || p.name);
+      return list.flatMap((p) => splitNames(p.shohibulName || p.name));
     }
 
     if (animal.pengkurbanId) {
@@ -93,7 +98,7 @@ export class AnimalsService {
         where: { id: animal.pengkurbanId },
         select: ['id', 'name', 'shohibulName'],
       });
-      if (p) return [p.shohibulName || p.name];
+      if (p) return splitNames(p.shohibulName || p.name);
     }
 
     return [];
@@ -371,8 +376,11 @@ export class AnimalsService {
         const cardY =
           PADDING + slot * (CARD_H + CARD_GAP);
         const L = PADDING + 16;
-        const QR_PANEL_W = 160; // diperlebar dari 120 supaya QR 140pt muat
-        const QR_X = PADDING + CARD_W - QR_PANEL_W;
+        const R = PADDING + CARD_W - 16; // right edge inside card
+        // QR top-right, smaller dari sebelumnya supaya names dapat full width
+        const QR_SIZE = 110;
+        const QR_X = R - QR_SIZE;
+        const QR_Y = cardY + 16;
 
         // Card background
         doc.save();
@@ -393,40 +401,59 @@ export class AnimalsService {
         doc.rect(PADDING, cardY + 5, 4, CARD_H - 5).fill('#10b981');
         doc.restore();
 
-        // Header
-        const headerY = cardY + 18;
-        doc.font('Helvetica-Bold').fontSize(9).fillColor('#10b981');
-        t('KARTU HEWAN QURBAN', L, headerY);
-        doc.font('Helvetica').fontSize(8).fillColor('#6b7280');
-        t('Panitia Qurban 1447 H CGE', L, headerY + 13);
+        // QR code top-right — smaller, no background panel (cleaner)
+        const qrDataUrl = qrMap[a.id];
+        if (qrDataUrl && qrDataUrl.includes(',')) {
+          try {
+            const qrBuffer = Buffer.from(qrDataUrl.split(',')[1], 'base64');
+            doc.image(qrBuffer, QR_X, QR_Y, { width: QR_SIZE, height: QR_SIZE });
+            doc.font('Helvetica-Bold').fontSize(7).fillColor('#10b981');
+            t('SCAN KARTU HEWAN', QR_X, QR_Y + QR_SIZE + 4, {
+              width: QR_SIZE,
+              align: 'center',
+            });
+          } catch {
+            /* skip */
+          }
+        }
 
-        // Animal code (font diperbesar 11→18)
+        // Header (kiri, narrow supaya ga overlap QR)
+        const headerY = cardY + 18;
+        const HEADER_W = QR_X - L - 12;
+        doc.font('Helvetica-Bold').fontSize(9).fillColor('#10b981');
+        t('KARTU HEWAN QURBAN', L, headerY, { width: HEADER_W });
+        doc.font('Helvetica').fontSize(8).fillColor('#6b7280');
+        t('Panitia Qurban 1447 H CGE', L, headerY + 13, { width: HEADER_W });
+
+        // Animal code (kiri, masih di atas — ga overlap QR karena code box 240 < HEADER_W)
         const codeY = cardY + 50;
         doc.roundedRect(L, codeY, 240, 32, 5).fillAndStroke('#f0fdf4', '#86efac');
         doc.font('Helvetica-Bold').fontSize(18).fillColor('#166534');
         t(a.animalCode, L, codeY + 8, { width: 240, align: 'center' });
 
-        // Animal type label (dikecilkan — udah jelas pas digantung ke hewan,
-        // ga perlu dominan; ruang dipakai untuk nama sohibul yg lebih penting)
+        // Animal type label
         const typeY = codeY + 42;
         doc.font('Helvetica-Bold').fontSize(13).fillColor('#6b7280');
         t(a.animalLabel, L, typeY);
 
-        // Sohibul names — yang paling penting, font paling gede
-        const namesY = typeY + 24;
+        // Sohibul names — sekarang dapat full card width (QR udah di atas)
+        // QR area ditelan dari bawah QR Y + label "SCAN..." selesai sekitar QR_Y + 130
+        const QR_BOTTOM = QR_Y + QR_SIZE + 14;
+        // Names start setelah animal label (atau setelah QR area, pilih yg lebih bawah)
+        const namesHeaderY = Math.max(typeY + 24, QR_BOTTOM);
         doc.font('Helvetica-Bold').fontSize(10).fillColor('#6b7280');
-        t('SOHIBUL QURBAN:', L, namesY);
+        t('SOHIBUL QURBAN:', L, namesHeaderY);
         const names: string[] = a.sohibulNames || [];
-        const NAMES_W = QR_X - L - 8; // available width before QR panel
-        const NAMES_MAX_Y = cardY + CARD_H - 28; // leave room for received-info footer
+        const NAMES_W = R - L; // full width!
+        const NAMES_MAX_Y = cardY + CARD_H - 28;
         const NAME_FONT_SIZE = 18;
         const NAME_LINE_GAP = 4;
         if (names.length === 0) {
           doc.font('Helvetica').fontSize(NAME_FONT_SIZE).fillColor('#9ca3af');
-          t('(Hewan Vendor — tidak terdaftar)', L, namesY + 18);
+          t('(Hewan Vendor — tidak terdaftar)', L, namesHeaderY + 18);
         } else {
           doc.font('Helvetica-Bold').fontSize(NAME_FONT_SIZE).fillColor('#1f2937');
-          let cursorY = namesY + 18;
+          let cursorY = namesHeaderY + 18;
           const toRender = names.slice(0, 7);
           for (let idx = 0; idx < toRender.length; idx++) {
             if (cursorY >= NAMES_MAX_Y) {
@@ -440,7 +467,6 @@ export class AnimalsService {
               lineGap: NAME_LINE_GAP,
             });
             cursorY = doc.y + NAME_LINE_GAP;
-            // reset after potential overflow font switch
             doc.font('Helvetica-Bold').fontSize(NAME_FONT_SIZE).fillColor('#1f2937');
           }
         }
@@ -455,27 +481,6 @@ export class AnimalsService {
           });
           doc.font('Helvetica').fontSize(6.5).fillColor('#6b7280');
           t(`Diterima: ${dateStr}`, L, recvY);
-        }
-
-        // QR code panel (QR diperbesar 80→140, panel diperlebar)
-        doc.roundedRect(QR_X, cardY + 10, QR_PANEL_W, CARD_H - 20, 6).fill('#ecfdf5');
-
-        const qrDataUrl = qrMap[a.id];
-        if (qrDataUrl && qrDataUrl.includes(',')) {
-          try {
-            const qrBuffer = Buffer.from(qrDataUrl.split(',')[1], 'base64');
-            const QR_SIZE = Math.min(QR_PANEL_W - 16, 140);
-            const qrX = QR_X + (QR_PANEL_W - QR_SIZE) / 2;
-            const qrY = cardY + 10 + (CARD_H - 20 - QR_SIZE - 24) / 2;
-            doc.image(qrBuffer, qrX, qrY, { width: QR_SIZE, height: QR_SIZE });
-            doc.font('Helvetica-Bold').fontSize(8).fillColor('#10b981');
-            t('SCAN KARTU HEWAN', QR_X, qrY + QR_SIZE + 8, {
-              width: QR_PANEL_W,
-              align: 'center',
-            });
-          } catch {
-            /* skip */
-          }
         }
 
         // Separator line between cards on same page
