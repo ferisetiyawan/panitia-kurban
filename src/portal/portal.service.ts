@@ -100,7 +100,6 @@ export class PortalService {
       status: p.status,
       statusLabel: STATUS_LABELS[p.status] || p.status,
       phone: p.phone,
-      notes: p.notes,
       createdAt: p.createdAt,
       event: p.event
         ? { id: p.event.id, name: p.event.name, year: p.event.year }
@@ -172,24 +171,45 @@ export class PortalService {
         ['Tahun', profile.event?.year || '-'],
       ];
 
-      doc
-        .roundedRect(50, y, PAGE_W, 12 + infoFields.length * 22 + 10, 6)
-        .fillAndStroke('#1e3a2f', '#10b981');
+      // Compute row heights up-front (multiline values wrap properly)
+      const LABEL_X = 66;
+      const VALUE_X = 210;
+      const VALUE_W = PAGE_W - (VALUE_X - 50) - 16;
+      const ROW_PAD = 6;
+      const rowHeights: number[] = infoFields.map(([, value]) => {
+        doc.font('Helvetica-Bold').fontSize(9);
+        const h = doc.heightOfString(String(value || '-'), { width: VALUE_W });
+        return Math.max(h, 12) + ROW_PAD;
+      });
+      const boxH =
+        12 + rowHeights.reduce((a, b) => a + b, 0) + 10;
+
+      doc.roundedRect(50, y, PAGE_W, boxH, 6).fillAndStroke('#1e3a2f', '#10b981');
       y += 12;
 
-      infoFields.forEach(([label, value]) => {
+      infoFields.forEach(([label, value], i) => {
         doc.font('Helvetica').fontSize(9).fillColor('#6ee7b7');
-        doc.text(label + ':', 66, y, { lineBreak: false });
+        doc.text(label + ':', LABEL_X, y, { lineBreak: false });
         doc.font('Helvetica-Bold').fontSize(9).fillColor('#ffffff');
-        doc.text(String(value || '-'), 210, y, {
-          lineBreak: false,
-          width: PAGE_W - 160,
-        });
-        y += 22;
+        doc.text(String(value || '-'), VALUE_X, y, { width: VALUE_W });
+        y += rowHeights[i];
       });
-      y += 16;
+      y += 20;
 
       // ─── Form Responses ───
+      const FR_LABEL_X = 66;
+      const FR_VALUE_X = 240;
+      const FR_VALUE_W = PAGE_W - (FR_VALUE_X - 50) - 16;
+      const FR_ROW_PAD = 4;
+      const PAGE_BOTTOM = doc.page.height - 60;
+
+      const ensureSpace = (needed: number) => {
+        if (y + needed > PAGE_BOTTOM) {
+          doc.addPage();
+          y = 50;
+        }
+      };
+
       if (formResponses.length > 0) {
         doc.font('Helvetica-Bold').fontSize(11).fillColor('#10b981');
         doc.text('Konfirmasi Teknis', 50, y);
@@ -200,6 +220,7 @@ export class PortalService {
             'id-ID',
             { day: 'numeric', month: 'long', year: 'numeric' },
           );
+          ensureSpace(20);
           doc.font('Helvetica').fontSize(8).fillColor('#9ca3af');
           doc.text(`Disubmit: ${submittedDate}`, 50, y);
           y += 14;
@@ -207,24 +228,25 @@ export class PortalService {
           const data = resp.data as Record<string, string>;
           const entries = Object.entries(data);
 
-          if (entries.length > 0) {
-            doc
-              .roundedRect(50, y, PAGE_W, 10 + entries.length * 18 + 8, 4)
-              .fillAndStroke('#1a2e22', '#374151');
-            y += 10;
+          for (const [key, val] of entries) {
+            doc.font('Helvetica').fontSize(8);
+            const valStr = String(val || '-');
+            const valH = doc.heightOfString(valStr, { width: FR_VALUE_W });
+            const rowH = Math.max(valH, 10) + FR_ROW_PAD;
+            ensureSpace(rowH + 4);
 
-            entries.forEach(([key, val]) => {
-              doc.font('Helvetica').fontSize(8).fillColor('#9ca3af');
-              doc.text(key + ':', 66, y, { lineBreak: false });
-              doc.font('Helvetica').fontSize(8).fillColor('#d1fae5');
-              doc.text(String(val || '-'), 240, y, {
-                lineBreak: false,
-                width: PAGE_W - 190,
-              });
-              y += 18;
+            doc.font('Helvetica').fontSize(8).fillColor('#9ca3af');
+            doc.text(key + ':', FR_LABEL_X, y, {
+              width: FR_VALUE_X - FR_LABEL_X - 8,
             });
-            y += 12;
+            doc.font('Helvetica').fontSize(8).fillColor('#d1fae5');
+            doc.text(valStr, FR_VALUE_X, y, { width: FR_VALUE_W });
+            const keyH = doc.heightOfString(key + ':', {
+              width: FR_VALUE_X - FR_LABEL_X - 8,
+            });
+            y += Math.max(valH, keyH, 10) + FR_ROW_PAD;
           }
+          y += 8;
         }
       } else {
         doc.font('Helvetica').fontSize(10).fillColor('#6b7280');
@@ -234,17 +256,6 @@ export class PortalService {
           y,
         );
         y += 20;
-      }
-
-      // ─── Notes ───
-      if (profile.notes) {
-        y += 8;
-        doc.font('Helvetica-Bold').fontSize(10).fillColor('#f59e0b');
-        doc.text('Catatan Panitia:', 50, y);
-        y += 14;
-        doc.font('Helvetica').fontSize(9).fillColor('#fef3c7');
-        doc.text(profile.notes, 50, y, { width: PAGE_W });
-        y += doc.heightOfString(profile.notes, { width: PAGE_W }) + 10;
       }
 
       // ─── Footer ───

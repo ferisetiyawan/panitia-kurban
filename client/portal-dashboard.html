@@ -68,12 +68,6 @@
       </div>
     </div>
 
-    <!-- Notes if any -->
-    <div class="card mb-4" id="card-notes" style="display:none;">
-      <div style="font-size:12px; font-weight:700; color:#f59e0b; margin-bottom:6px;">📝 Catatan Panitia</div>
-      <div style="font-size:13px; color:#fef3c7;" id="notes-text"></div>
-    </div>
-
     <!-- Form Response Card -->
     <div class="card mb-4">
       <div style="font-size:14px; font-weight:700; color:#f0fdf4; margin-bottom:4px;">📋 Konfirmasi Teknis</div>
@@ -171,12 +165,6 @@
       }
       if (profile.status === 'REJECTED') {
         document.getElementById('rejected-notice').style.display = 'block';
-      }
-
-      // Notes
-      if (profile.notes) {
-        document.getElementById('card-notes').style.display = 'block';
-        document.getElementById('notes-text').textContent = profile.notes;
       }
     }
 
