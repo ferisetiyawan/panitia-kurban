@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portal Sohibul Qurban - Masjid Al Hijrah CGE</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="bg-orb bg-orb-1"></div>
+  <div class="bg-orb bg-orb-2"></div>
+
+  <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px;">
+    <div style="width: 100%; max-width: 420px;">
+
+      <!-- Logo / Header -->
+      <div class="text-center" style="margin-bottom: 32px;">
+        <div style="font-size: 56px; margin-bottom: 12px;">🕌</div>
+        <h1 style="font-size: 22px; font-weight: 800; color: #f0fdf4; margin-bottom: 4px;">Portal Sohibul Qurban</h1>
+        <p style="color: #6ee7b7; font-size: 14px;">Masjid Al Hijrah CGE</p>
+      </div>
+
+      <!-- Login Card -->
+      <div class="card" style="padding: 32px;">
+        <h2 style="font-size: 16px; font-weight: 700; color: #f0fdf4; margin-bottom: 8px;">Masuk dengan Nomor WhatsApp</h2>
+        <p style="color: #9ca3af; font-size: 13px; margin-bottom: 24px;">
+          Masukkan nomor WA yang Anda gunakan saat mendaftar kurban.
+        </p>
+
+        <div class="form-group">
+          <label for="phone">Nomor WhatsApp</label>
+          <input
+            type="tel"
+            id="phone"
+            class="input-field"
+            placeholder="0812-3456-7890"
+            autocomplete="tel"
+            onkeydown="if(event.key==='Enter') doLogin()"
+          >
+        </div>
+
+        <div id="error-msg" style="display:none; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); border-radius:8px; padding:10px 14px; color:#fca5a5; font-size:13px; margin-bottom:16px;"></div>
+
+        <button onclick="doLogin()" id="btn-login" class="btn-primary" style="width: 100%; padding: 12px; font-size: 15px; font-weight: 700;">
+          Masuk →
+        </button>
+
+        <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.08); text-align: center;">
+          <p style="color: #6b7280; font-size: 12px;">Belum mendaftar?</p>
+          <a href="/daftar.html" style="color: #10b981; font-size: 13px; font-weight: 600;">Daftar Qurban →</a>
+          <span style="color: #374151; margin: 0 8px;">·</span>
+          <a href="/status.html" style="color: #6ee7b7; font-size: 13px;">Cek Status</a>
+        </div>
+      </div>
+
+      <p style="text-align: center; color: #374151; font-size: 11px; margin-top: 20px;">
+        Sistem Manajemen Panitia Kurban — Idul Adha 1447 H
+      </p>
+    </div>
+  </div>
+
+  <script>
+    // If already logged in, go to dashboard
+    if (localStorage.getItem('portalToken')) {
+      window.location.href = '/portal-dashboard.html';
+    }
+
+    async function doLogin() {
+      const phone = document.getElementById('phone').value.trim();
+      if (!phone) {
+        showError('Nomor WhatsApp wajib diisi');
+        return;
+      }
+
+      const btn = document.getElementById('btn-login');
+      btn.textContent = 'Memproses...';
+      btn.disabled = true;
+      hideError();
+
+      try {
+        const res = await fetch('/api/portal/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          showError(data.message || 'Gagal masuk. Pastikan nomor WA sudah terdaftar.');
+          return;
+        }
+
+        localStorage.setItem('portalToken', data.token);
+        localStorage.setItem('portalUser', JSON.stringify(data.pengkurban));
+        window.location.href = '/portal-dashboard.html';
+
+      } catch (e) {
+        showError('Gagal terhubung ke server. Coba lagi.');
+      } finally {
+        btn.textContent = 'Masuk →';
+        btn.disabled = false;
+      }
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('error-msg');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+
+    function hideError() {
+      document.getElementById('error-msg').style.display = 'none';
+    }
+  </script>
+</body>
+</html>
