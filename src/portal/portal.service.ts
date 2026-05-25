@@ -90,7 +90,7 @@ export class PortalService {
       );
     }
 
-    const { form1 } = this.normalizePhone(phone);
+    const { form1, form2 } = this.normalizePhone(phone);
 
     // Rate-limit: max 1 OTP request per phone per OTP_MIN_INTERVAL_MS
     const recent = await this.otpRepository.findOne({
@@ -125,10 +125,11 @@ export class PortalService {
       `Kode Anda: *${code}*\n\n` +
       `Berlaku 5 menit. Jangan bagikan kode ini ke siapa pun.\n` +
       `Jika bukan Anda yang meminta, abaikan pesan ini.`;
-    const sent = await this.waNotifier.sendTo(form1, message);
+    // wa-bot requires international format (628xxx), not local (08xxx)
+    const sent = await this.waNotifier.sendTo(form2, message);
     if (!sent) {
       this.logger.warn(
-        `[portal.requestOtp] WA send failed for ${form1}, OTP still issued`,
+        `[portal.requestOtp] WA send failed for ${form2}, OTP still issued`,
       );
     }
 
