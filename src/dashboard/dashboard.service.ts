@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Not, Repository } from 'typeorm';
 import { Voucher } from '../vouchers/voucher.entity';
 import { Event } from '../events/event.entity';
 import { User } from '../users/user.entity';
 import { Pengkurban } from '../pengkurban/pengkurban.entity';
 import { VoucherStatus } from '../common/enums/voucher-status.enum';
+import { RegistrationStatus } from '../common/enums/registration-status.enum';
 
 @Injectable()
 export class DashboardService {
@@ -61,12 +62,15 @@ export class DashboardService {
       where: { isActive: true },
     });
 
-    let totalPengkurban = 0;
+    const pengkurbanWhere: Record<string, unknown> = {
+      status: Not(RegistrationStatus.REJECTED),
+    };
     if (eventId) {
-      totalPengkurban = await this.pengkurbanRepo.count({ where: { eventId } });
-    } else {
-      totalPengkurban = await this.pengkurbanRepo.count();
+      pengkurbanWhere.eventId = eventId;
     }
+    const totalPengkurban = await this.pengkurbanRepo.count({
+      where: pengkurbanWhere,
+    });
 
     const totalEvents = await this.eventsRepo.count();
 
