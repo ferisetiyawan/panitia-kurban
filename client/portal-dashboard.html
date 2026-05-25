@@ -13,6 +13,11 @@
 
   <div style="max-width: 640px; margin: 0 auto; padding: 16px;">
 
+    <!-- Impersonation banner -->
+    <div id="impersonate-banner" style="display:none; background:rgba(245,158,11,0.18); border:1px solid rgba(245,158,11,0.4); border-radius:8px; padding:10px 14px; margin-top:16px; color:#fcd34d; font-size:13px; text-align:center;">
+      🔎 <strong>Mode Admin Impersonate</strong> — Anda melihat halaman ini sebagai sohibul. Edit akan benar-benar mengubah data.
+    </div>
+
     <!-- Top bar -->
     <div style="display:flex; align-items:center; justify-content:space-between; padding:16px 0 24px;">
       <div>
@@ -22,6 +27,13 @@
       <button onclick="doLogout()" style="background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); color:#fca5a5; border-radius:8px; padding:8px 14px; font-size:13px; cursor:pointer;">
         Keluar
       </button>
+    </div>
+
+    <!-- Registration switcher (visible only if user has >1 registration) -->
+    <div id="reg-switcher-wrap" style="display:none; margin-bottom:16px;">
+      <label style="font-size:11px; color:#9ca3af; display:block; margin-bottom:4px;">Pilih pendaftaran (Anda punya beberapa):</label>
+      <select id="reg-switcher" onchange="switchRegistration(this.value)" class="input-field" style="background:rgba(255,255,255,0.07);">
+      </select>
     </div>
 
     <!-- Status Card -->
@@ -356,17 +368,43 @@
       }
     }
 
+    async function switchRegistration(pengkurbanId) {
+      try {
+        const res = await portalApi('/auth/switch/' + pengkurbanId, { method: 'POST' });
+        localStorage.setItem('portalToken', res.token);
+        localStorage.setItem('portalUser', JSON.stringify(res.pengkurban));
+        window.location.reload();
+      } catch (e) {
+        alert('Gagal switch pendaftaran: ' + e.message);
+      }
+    }
+
+    function renderRegSwitcher(regs, currentId) {
+      if (!regs || regs.length <= 1) return;
+      const sel = document.getElementById('reg-switcher');
+      sel.innerHTML = regs.map(r => `
+        <option value="${r.id}" ${r.id === currentId ? 'selected' : ''}>
+          ${escapeHtml(r.registrationNumber)} — ${escapeHtml(r.animalLabel)} (${escapeHtml(r.statusLabel)})
+        </option>`).join('');
+      document.getElementById('reg-switcher-wrap').style.display = 'block';
+    }
+
     async function init() {
       try {
-        const [profile, formResponses, animals] = await Promise.all([
+        const [profile, formResponses, animals, registrations] = await Promise.all([
           portalApi('/me'),
           portalApi('/form-response'),
           portalApi('/animals'),
+          portalApi('/registrations').catch(() => []),
         ]);
         currentShohibulName = profile.shohibulName || profile.name;
+        if (profile.impersonatedBy) {
+          document.getElementById('impersonate-banner').style.display = 'block';
+        }
         renderProfile(profile);
         renderFormResponse(formResponses);
         renderAnimals(animals, profile.animalType);
+        renderRegSwitcher(registrations, profile.id);
       } catch (e) {
         if (e.message !== 'Session expired') {
           document.getElementById('form-response-content').innerHTML =

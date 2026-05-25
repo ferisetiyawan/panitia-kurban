@@ -3,15 +3,20 @@ import {
   Post,
   Get,
   Patch,
+  Param,
   Body,
   Res,
   UseGuards,
   Request,
   BadRequestException,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import type { Response } from 'express';
 import { PortalService } from './portal.service';
 import { PortalJwtGuard } from './portal-jwt.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { Role } from '../common/enums/role.enum';
 
 @Controller('api/portal')
 export class PortalController {
@@ -33,10 +38,34 @@ export class PortalController {
     return this.portalService.verifyOtp(body.phone, body.code);
   }
 
+  @Get('registrations')
+  @UseGuards(PortalJwtGuard)
+  listRegistrations(@Request() req: any) {
+    if (!req.user.phone) return [];
+    return this.portalService.listRegistrationsForPhone(req.user.phone);
+  }
+
+  @Post('auth/switch/:pengkurbanId')
+  @UseGuards(PortalJwtGuard)
+  switchRegistration(@Request() req: any, @Param('pengkurbanId') id: string) {
+    if (!req.user.phone) {
+      throw new BadRequestException('Token tidak punya phone — login ulang');
+    }
+    return this.portalService.switchRegistration(req.user.phone, id);
+  }
+
+  @Post('auth/impersonate/:pengkurbanId')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(Role.SUPER_ADMIN, Role.KETUA_PANITIA, Role.PANITIA_VOUCHER)
+  impersonate(@Request() req: any, @Param('pengkurbanId') id: string) {
+    return this.portalService.impersonate(id, req.user.id);
+  }
+
   @Get('me')
   @UseGuards(PortalJwtGuard)
-  getProfile(@Request() req: any) {
-    return this.portalService.getProfile(req.user.id);
+  async getProfile(@Request() req: any) {
+    const profile = await this.portalService.getProfile(req.user.id);
+    return { ...profile, impersonatedBy: req.user.impersonatedBy || null };
   }
 
   @Patch('me')

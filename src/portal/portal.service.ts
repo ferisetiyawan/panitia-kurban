@@ -73,13 +73,64 @@ export class PortalService {
   private async findPengkurbanByPhone(
     phone: string,
   ): Promise<Pengkurban | null> {
+    const list = await this.findAllPengkurbanByPhone(phone);
+    return list[0] || null;
+  }
+
+  private async findAllPengkurbanByPhone(
+    phone: string,
+  ): Promise<Pengkurban[]> {
     const { form1, form2 } = this.normalizePhone(phone);
     return this.pengkurbanRepository
       .createQueryBuilder('p')
       .leftJoinAndSelect('p.event', 'event')
       .where('p.phone = :form1 OR p.phone = :form2', { form1, form2 })
-      .orderBy('p.created_at', 'DESC')
-      .getOne();
+      .orderBy('p.created_at', 'ASC')
+      .getMany();
+  }
+
+  async listRegistrationsForPhone(phone: string): Promise<any[]> {
+    const list = await this.findAllPengkurbanByPhone(phone);
+    return list.map((p) => ({
+      id: p.id,
+      registrationNumber: p.registrationNumber,
+      name: p.name,
+      shohibulName: p.shohibulName,
+      animalType: p.animalType,
+      animalLabel: ANIMAL_LABELS[p.animalType] || p.animalType,
+      status: p.status,
+      statusLabel: STATUS_LABELS[p.status] || p.status,
+      eventYear: p.event?.year || null,
+    }));
+  }
+
+  async switchRegistration(
+    phone: string,
+    pengkurbanId: string,
+  ): Promise<{ token: string; pengkurban: Partial<Pengkurban> }> {
+    const list = await this.findAllPengkurbanByPhone(phone);
+    const target = list.find((p) => p.id === pengkurbanId);
+    if (!target) {
+      throw new UnauthorizedException(
+        'Pendaftaran tidak ditemukan untuk nomor ini',
+      );
+    }
+    const payload = {
+      sub: target.id,
+      type: 'sohibul',
+      phone: this.normalizePhone(phone).form1,
+      name: target.shohibulName || target.name,
+    };
+    return {
+      token: this.jwtService.sign(payload),
+      pengkurban: {
+        id: target.id,
+        name: target.name,
+        registrationNumber: target.registrationNumber,
+        animalType: target.animalType,
+        status: target.status,
+      },
+    };
   }
 
   async requestOtp(phone: string): Promise<{ message: string }> {
@@ -183,6 +234,7 @@ export class PortalService {
     const payload = {
       sub: pengkurban.id,
       type: 'sohibul',
+      phone: form1,
       name: pengkurban.shohibulName || pengkurban.name,
     };
     const token = this.jwtService.sign(payload);
@@ -195,6 +247,39 @@ export class PortalService {
         registrationNumber: pengkurban.registrationNumber,
         animalType: pengkurban.animalType,
         status: pengkurban.status,
+      },
+    };
+  }
+
+  async impersonate(
+    pengkurbanId: string,
+    adminUserId: string,
+  ): Promise<{ token: string; pengkurban: Partial<Pengkurban> }> {
+    const target = await this.pengkurbanRepository.findOne({
+      where: { id: pengkurbanId },
+    });
+    if (!target) {
+      throw new NotFoundException('Pengkurban tidak ditemukan');
+    }
+    const phoneForm1 = this.normalizePhone(target.phone || '').form1;
+    const payload = {
+      sub: target.id,
+      type: 'sohibul',
+      phone: phoneForm1,
+      name: target.shohibulName || target.name,
+      impersonatedBy: adminUserId,
+    };
+    this.logger.warn(
+      `[portal.impersonate] admin=${adminUserId} viewing pengkurban=${pengkurbanId} (${target.registrationNumber})`,
+    );
+    return {
+      token: this.jwtService.sign(payload),
+      pengkurban: {
+        id: target.id,
+        name: target.name,
+        registrationNumber: target.registrationNumber,
+        animalType: target.animalType,
+        status: target.status,
       },
     };
   }

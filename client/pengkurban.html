@@ -440,6 +440,7 @@
           ${verifyBtn}
           ${infaqBtn}
           <button class="btn-secondary btn-sm" onclick='editData(${escHtml(JSON.stringify(d))})'>Edit</button>
+          <button class="btn-secondary btn-sm" title="Buka portal sebagai sohibul ini" onclick="impersonateSohibul('${d.id}')">🔎 Lihat as Sohibul</button>
           <button class="btn-danger btn-sm" onclick="deleteData('${d.id}')">Hapus</button>
         </div></td>
       </tr>`;
@@ -593,6 +594,27 @@
     }
 
     function closeVerifyModal() { document.getElementById('verify-modal').classList.remove('active'); }
+
+    async function impersonateSohibul(pengkurbanId) {
+      try {
+        const res = await fetch(`/api/portal/auth/impersonate/${pengkurbanId}`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${getToken()}` },
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          showToast(data.message || 'Gagal impersonate', 'error');
+          return;
+        }
+        // Set portal token in this tab so dashboard inherits via localStorage
+        // (tradeoff: overwrites admin's own portal session if they had one)
+        localStorage.setItem('portalToken', data.token);
+        localStorage.setItem('portalUser', JSON.stringify(data.pengkurban));
+        window.open('/portal-dashboard.html', '_blank');
+      } catch (err) {
+        showToast('Gagal impersonate: ' + err.message, 'error');
+      }
+    }
 
     async function toggleInfaq(id, paid) {
       try {
