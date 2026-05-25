@@ -187,6 +187,12 @@
     };
     const PURCHASE_LABELS = { BELI_MASJID: 'Beli via Masjid', BAWA_SENDIRI: 'Bawa Sendiri' };
 
+    function formatSohibulNames(raw) {
+      const lines = (raw || '').split('\n').map(l => l.trim()).filter(Boolean);
+      if (lines.length <= 1) return lines[0] || '-';
+      return lines.map((n, i) => `${i + 1}. ${n}`).join('\n');
+    }
+
     function renderProfile(profile) {
       // Greeting
       const name = profile.shohibulName || profile.name;
@@ -195,7 +201,7 @@
       // Status card
       document.getElementById('card-status').style.display = 'block';
       document.getElementById('reg-number').textContent = profile.registrationNumber;
-      document.getElementById('sohibul-name').textContent = profile.shohibulName || profile.name;
+      document.getElementById('sohibul-name').textContent = formatSohibulNames(profile.shohibulName || profile.name);
       document.getElementById('pendaftar-name').textContent = profile.name;
       document.getElementById('animal-type').textContent = ANIMAL_LABELS[profile.animalType] || profile.animalType;
       document.getElementById('event-name').textContent = profile.event?.name || '-';
@@ -357,7 +363,7 @@
           body: JSON.stringify({ shohibulName: newName }),
         });
         currentShohibulName = res.shohibulName;
-        document.getElementById('sohibul-name').textContent = res.shohibulName;
+        document.getElementById('sohibul-name').textContent = formatSohibulNames(res.shohibulName);
         document.getElementById('greeting').textContent = `👋 ${res.shohibulName.split(/[\s\n]+/)[0]}`;
         cancelEditSohibul();
       } catch (e) {
