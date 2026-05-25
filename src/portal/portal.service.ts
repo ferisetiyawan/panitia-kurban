@@ -1,11 +1,21 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { LessThan, MoreThan, Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
+import { createHash, randomInt } from 'crypto';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const PDFDocument = require('pdfkit');
 import { Pengkurban } from '../pengkurban/pengkurban.entity';
 import { FormResponse } from '../form-responses/form-response.entity';
+import { PortalOtp } from './portal-otp.entity';
+import { Animal } from '../animals/animal.entity';
+import { WaNotifierService } from '../common/notifications/wa-notifier.service';
 
 const STATUS_LABELS: Record<string, string> = {
   PENDING_PAYMENT: 'Menunggu Pembayaran',
@@ -25,41 +35,146 @@ const ANIMAL_LABELS: Record<string, string> = {
   SAPI_PERORANGAN: 'Sapi Perorangan',
 };
 
+const OTP_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const OTP_MIN_INTERVAL_MS = 60 * 1000; // 1 min between requests per phone
+const OTP_MAX_ATTEMPTS = 5;
+
 @Injectable()
 export class PortalService {
+  private readonly logger = new Logger(PortalService.name);
+
   constructor(
     @InjectRepository(Pengkurban)
     private pengkurbanRepository: Repository<Pengkurban>,
     @InjectRepository(FormResponse)
     private formResponseRepository: Repository<FormResponse>,
+    @InjectRepository(PortalOtp)
+    private otpRepository: Repository<PortalOtp>,
+    @InjectRepository(Animal)
+    private animalRepository: Repository<Animal>,
     private jwtService: JwtService,
+    private waNotifier: WaNotifierService,
   ) {}
 
   private normalizePhone(raw: string): { form1: string; form2: string } {
     const clean = raw.replace(/\D/g, '');
     let base = clean;
     if (base.startsWith('62')) base = '0' + base.slice(2);
+    if (!base.startsWith('0')) base = '0' + base;
     const form1 = base; // 08xxx
     const form2 = '62' + base.slice(1); // 628xxx
     return { form1, form2 };
   }
 
-  async login(
-    phone: string,
-  ): Promise<{ token: string; pengkurban: Partial<Pengkurban> }> {
-    const { form1, form2 } = this.normalizePhone(phone);
+  private hashCode(code: string): string {
+    return createHash('sha256').update(code).digest('hex');
+  }
 
-    const pengkurban = await this.pengkurbanRepository
+  private async findPengkurbanByPhone(
+    phone: string,
+  ): Promise<Pengkurban | null> {
+    const { form1, form2 } = this.normalizePhone(phone);
+    return this.pengkurbanRepository
       .createQueryBuilder('p')
       .leftJoinAndSelect('p.event', 'event')
       .where('p.phone = :form1 OR p.phone = :form2', { form1, form2 })
       .orderBy('p.created_at', 'DESC')
       .getOne();
+  }
 
+  async requestOtp(phone: string): Promise<{ message: string }> {
+    const pengkurban = await this.findPengkurbanByPhone(phone);
     if (!pengkurban) {
       throw new NotFoundException(
         'Nomor WhatsApp tidak terdaftar sebagai pengkurban',
       );
+    }
+
+    const { form1 } = this.normalizePhone(phone);
+
+    // Rate-limit: max 1 OTP request per phone per OTP_MIN_INTERVAL_MS
+    const recent = await this.otpRepository.findOne({
+      where: {
+        phone: form1,
+        createdAt: MoreThan(new Date(Date.now() - OTP_MIN_INTERVAL_MS)),
+      },
+      order: { createdAt: 'DESC' },
+    });
+    if (recent) {
+      const waitSec = Math.ceil(
+        (recent.createdAt.getTime() + OTP_MIN_INTERVAL_MS - Date.now()) / 1000,
+      );
+      throw new BadRequestException(
+        `Terlalu cepat. Coba lagi dalam ${waitSec} detik.`,
+      );
+    }
+
+    // Invalidate any prior unused codes for this phone
+    await this.otpRepository.delete({ phone: form1 });
+
+    const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
+    await this.otpRepository.save({
+      phone: form1,
+      codeHash: this.hashCode(code),
+      expiresAt: new Date(Date.now() + OTP_TTL_MS),
+      attempts: 0,
+    });
+
+    const message =
+      `🔐 Kode login Portal Sohibul Qurban Masjid Al Hijrah CGE\n\n` +
+      `Kode Anda: *${code}*\n\n` +
+      `Berlaku 5 menit. Jangan bagikan kode ini ke siapa pun.\n` +
+      `Jika bukan Anda yang meminta, abaikan pesan ini.`;
+    const sent = await this.waNotifier.sendTo(form1, message);
+    if (!sent) {
+      this.logger.warn(
+        `[portal.requestOtp] WA send failed for ${form1}, OTP still issued`,
+      );
+    }
+
+    return {
+      message: `Kode OTP dikirim ke WhatsApp ${form1.replace(/(\d{4})\d+(\d{3})/, '$1***$2')}`,
+    };
+  }
+
+  async verifyOtp(
+    phone: string,
+    code: string,
+  ): Promise<{ token: string; pengkurban: Partial<Pengkurban> }> {
+    const { form1 } = this.normalizePhone(phone);
+
+    const otp = await this.otpRepository.findOne({
+      where: { phone: form1 },
+      order: { createdAt: 'DESC' },
+    });
+    if (!otp) {
+      throw new UnauthorizedException('Kode OTP tidak ditemukan');
+    }
+    if (otp.expiresAt < new Date()) {
+      await this.otpRepository.delete({ id: otp.id });
+      throw new UnauthorizedException('Kode OTP sudah kedaluwarsa');
+    }
+    if (otp.attempts >= OTP_MAX_ATTEMPTS) {
+      await this.otpRepository.delete({ id: otp.id });
+      throw new UnauthorizedException(
+        'Terlalu banyak percobaan. Silakan minta OTP baru.',
+      );
+    }
+
+    if (otp.codeHash !== this.hashCode(code)) {
+      await this.otpRepository.increment({ id: otp.id }, 'attempts', 1);
+      const remaining = OTP_MAX_ATTEMPTS - (otp.attempts + 1);
+      throw new UnauthorizedException(
+        `Kode OTP salah. Sisa percobaan: ${Math.max(remaining, 0)}`,
+      );
+    }
+
+    // Success — delete code
+    await this.otpRepository.delete({ id: otp.id });
+
+    const pengkurban = await this.findPengkurbanByPhone(phone);
+    if (!pengkurban) {
+      throw new NotFoundException('Pengkurban tidak ditemukan');
     }
 
     const payload = {
@@ -67,7 +182,6 @@ export class PortalService {
       type: 'sohibul',
       name: pengkurban.shohibulName || pengkurban.name,
     };
-
     const token = this.jwtService.sign(payload);
 
     return {
@@ -80,6 +194,67 @@ export class PortalService {
         status: pengkurban.status,
       },
     };
+  }
+
+  // Housekeeping: caller can wire this to a cron if desired
+  async cleanupExpiredOtp(): Promise<void> {
+    await this.otpRepository.delete({ expiresAt: LessThan(new Date()) });
+  }
+
+  async updateShohibulName(
+    pengkurbanId: string,
+    shohibulName: string,
+  ): Promise<{ shohibulName: string }> {
+    const trimmed = shohibulName.trim();
+    if (!trimmed) {
+      throw new BadRequestException('Nama sohibul tidak boleh kosong');
+    }
+    if (trimmed.length > 2000) {
+      throw new BadRequestException('Nama sohibul terlalu panjang');
+    }
+    const p = await this.pengkurbanRepository.findOne({
+      where: { id: pengkurbanId },
+    });
+    if (!p) throw new NotFoundException('Pengkurban tidak ditemukan');
+    p.shohibulName = trimmed;
+    await this.pengkurbanRepository.save(p);
+    return { shohibulName: trimmed };
+  }
+
+  async getAnimalsForSohibul(pengkurbanId: string): Promise<any[]> {
+    const p = await this.pengkurbanRepository.findOne({
+      where: { id: pengkurbanId },
+    });
+    if (!p) return [];
+
+    const KOLEKTIF_TYPES = new Set([
+      'SAPI_KOLEKTIF',
+      'SAPI_KOLEKTIF_A',
+      'SAPI_KOLEKTIF_B',
+      'SAPI_KOLEKTIF_C',
+    ]);
+
+    let animals: Animal[];
+    if (KOLEKTIF_TYPES.has(p.animalType)) {
+      animals = await this.animalRepository.find({
+        where: { animalType: p.animalType, eventId: p.eventId },
+        order: { animalCode: 'ASC' },
+      });
+    } else {
+      animals = await this.animalRepository.find({
+        where: { pengkurbanId: p.id },
+        order: { animalCode: 'ASC' },
+      });
+    }
+
+    return animals.map((a) => ({
+      animalCode: a.animalCode,
+      animalType: a.animalType,
+      status: a.status,
+      receivedAt: a.receivedAt,
+      photos: a.photos || [],
+      isVendorAnimal: a.isVendorAnimal,
+    }));
   }
 
   async getProfile(pengkurbanId: string): Promise<any> {

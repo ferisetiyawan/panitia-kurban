@@ -36,10 +36,32 @@
 
       <div style="border-top:1px solid rgba(255,255,255,0.08); margin:16px 0;"></div>
 
+      <!-- Sohibul name (full-width, multi-line, editable) -->
+      <div style="margin-bottom:16px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+          <div style="font-size:11px; color:#6b7280;">Nama Sohibul (yang dicantumkan saat penyembelihan)</div>
+          <button onclick="openEditSohibul()" id="btn-edit-sohibul" style="background:none; border:1px solid rgba(110,231,183,0.3); color:#6ee7b7; border-radius:6px; padding:3px 10px; font-size:11px; cursor:pointer;">
+            ✏️ Edit
+          </button>
+        </div>
+        <div style="font-size:13px; font-weight:600; color:#f0fdf4; white-space:pre-wrap;" id="sohibul-name">-</div>
+
+        <!-- Edit form (hidden by default) -->
+        <div id="sohibul-edit-form" style="display:none; margin-top:10px;">
+          <textarea id="sohibul-edit-input" class="input-field" rows="6" style="width:100%; resize:vertical; font-family:inherit;" placeholder="Tulis satu nama per baris..."></textarea>
+          <div style="font-size:11px; color:#6b7280; margin-top:6px;">Tip: tulis 1 nama per baris untuk daftar sohibul keluarga.</div>
+          <div id="sohibul-edit-error" style="display:none; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); border-radius:6px; padding:8px 12px; color:#fca5a5; font-size:12px; margin-top:8px;"></div>
+          <div style="display:flex; gap:8px; margin-top:10px;">
+            <button onclick="saveSohibulName()" id="btn-save-sohibul" class="btn-primary" style="flex:1; padding:8px;">💾 Simpan</button>
+            <button onclick="cancelEditSohibul()" style="flex:1; padding:8px; background:rgba(107,114,128,0.15); border:1px solid rgba(107,114,128,0.3); color:#9ca3af; border-radius:8px; cursor:pointer;">Batal</button>
+          </div>
+        </div>
+      </div>
+
       <div class="grid grid-cols-2 gap-4">
         <div>
-          <div style="font-size:11px; color:#6b7280; margin-bottom:2px;">Nama Sohibul</div>
-          <div style="font-size:14px; font-weight:600; color:#f0fdf4;" id="sohibul-name">-</div>
+          <div style="font-size:11px; color:#6b7280; margin-bottom:2px;">Nama Pendaftar</div>
+          <div style="font-size:13px; color:#9ca3af;" id="pendaftar-name">-</div>
         </div>
         <div>
           <div style="font-size:11px; color:#6b7280; margin-bottom:2px;">Jenis Hewan</div>
@@ -65,6 +87,15 @@
       <div id="rejected-notice" style="display:none; margin-top:16px; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); border-radius:8px; padding:12px;">
         <div style="font-size:13px; color:#fca5a5; font-weight:600; margin-bottom:4px;">❌ Pendaftaran Ditolak</div>
         <div style="font-size:12px; color:#fca5a5;">Hubungi panitia untuk informasi lebih lanjut.</div>
+      </div>
+    </div>
+
+    <!-- Hewan Saya Card -->
+    <div class="card mb-4" id="card-animals" style="display:none;">
+      <div style="font-size:14px; font-weight:700; color:#f0fdf4; margin-bottom:4px;">🐄 Hewan Qurban Saya</div>
+      <div style="font-size:12px; color:#6b7280; margin-bottom:16px;" id="animals-subtitle">Hewan yang teralokasikan untuk pendaftaran Anda</div>
+      <div id="animals-content">
+        <div style="color:#9ca3af; font-size:13px;">Memuat...</div>
       </div>
     </div>
 
@@ -104,9 +135,14 @@
       window.location.href = '/portal.html';
     }
 
-    async function portalApi(path) {
+    async function portalApi(path, options = {}) {
       const res = await fetch('/api/portal' + path, {
-        headers: { Authorization: `Bearer ${portalToken}` },
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${portalToken}`,
+          ...(options.headers || {}),
+        },
       });
       if (res.status === 401) {
         doLogout();
@@ -142,12 +178,13 @@
     function renderProfile(profile) {
       // Greeting
       const name = profile.shohibulName || profile.name;
-      document.getElementById('greeting').textContent = `👋 ${name.split(' ')[0]}`;
+      document.getElementById('greeting').textContent = `👋 ${name.split(/[\s\n]+/)[0]}`;
 
       // Status card
       document.getElementById('card-status').style.display = 'block';
       document.getElementById('reg-number').textContent = profile.registrationNumber;
       document.getElementById('sohibul-name').textContent = profile.shohibulName || profile.name;
+      document.getElementById('pendaftar-name').textContent = profile.name;
       document.getElementById('animal-type').textContent = ANIMAL_LABELS[profile.animalType] || profile.animalType;
       document.getElementById('event-name').textContent = profile.event?.name || '-';
       document.getElementById('purchase-type').textContent = PURCHASE_LABELS[profile.purchaseType] || profile.purchaseType;
@@ -224,14 +261,112 @@
       }
     }
 
+    const ANIMAL_STATUS_LABELS = {
+      PENDING: { text: '⏳ Belum Diterima', color: '#fcd34d', bg: 'rgba(245,158,11,0.12)' },
+      RECEIVED: { text: '✅ Diterima Panitia', color: '#6ee7b7', bg: 'rgba(16,185,129,0.12)' },
+    };
+
+    function escapeHtml(s) {
+      return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    function renderAnimals(animals, animalType) {
+      const isKolektif = /^SAPI_KOLEKTIF/.test(animalType || '');
+      const el = document.getElementById('animals-content');
+      const sub = document.getElementById('animals-subtitle');
+      document.getElementById('card-animals').style.display = 'block';
+
+      if (isKolektif) {
+        sub.textContent = `Daftar hewan ${ANIMAL_LABELS[animalType] || animalType} di event ini (share dengan sohibul lain)`;
+      } else {
+        sub.textContent = 'Hewan yang dialokasikan khusus untuk Anda';
+      }
+
+      if (!animals || animals.length === 0) {
+        el.innerHTML = `
+          <div style="background:rgba(107,114,128,0.1); border-radius:8px; padding:14px; text-align:center;">
+            <div style="font-size:24px; margin-bottom:8px;">🐄</div>
+            <div style="color:#9ca3af; font-size:13px;">Belum ada hewan teralokasikan.</div>
+            <div style="color:#6b7280; font-size:12px; margin-top:4px;">Hewan akan muncul setelah panitia generate.</div>
+          </div>`;
+        return;
+      }
+
+      el.innerHTML = animals.map(a => {
+        const st = ANIMAL_STATUS_LABELS[a.status] || { text: a.status, color: '#9ca3af', bg: 'rgba(107,114,128,0.12)' };
+        const received = a.receivedAt
+          ? new Date(a.receivedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+          : null;
+        return `
+          <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:8px; padding:12px; margin-bottom:8px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+              <div style="font-family:monospace; font-size:13px; font-weight:700; color:#10b981;">${escapeHtml(a.animalCode)}</div>
+              <span style="background:${st.bg}; color:${st.color}; border-radius:20px; padding:3px 10px; font-size:11px; font-weight:600; white-space:nowrap;">${st.text}</span>
+            </div>
+            ${received ? `<div style="font-size:11px; color:#6b7280; margin-top:6px;">Diterima panitia: ${received}</div>` : ''}
+          </div>`;
+      }).join('');
+    }
+
+    let currentShohibulName = '';
+    function openEditSohibul() {
+      document.getElementById('sohibul-edit-input').value = currentShohibulName;
+      document.getElementById('sohibul-edit-form').style.display = 'block';
+      document.getElementById('btn-edit-sohibul').style.display = 'none';
+      document.getElementById('sohibul-edit-input').focus();
+    }
+    function cancelEditSohibul() {
+      document.getElementById('sohibul-edit-form').style.display = 'none';
+      document.getElementById('btn-edit-sohibul').style.display = 'inline-block';
+      hideEditError();
+    }
+    function hideEditError() {
+      document.getElementById('sohibul-edit-error').style.display = 'none';
+    }
+    function showEditError(msg) {
+      const el = document.getElementById('sohibul-edit-error');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+
+    async function saveSohibulName() {
+      const newName = document.getElementById('sohibul-edit-input').value.trim();
+      if (!newName) {
+        showEditError('Nama sohibul tidak boleh kosong');
+        return;
+      }
+      const btn = document.getElementById('btn-save-sohibul');
+      btn.textContent = 'Menyimpan...';
+      btn.disabled = true;
+      hideEditError();
+      try {
+        const res = await portalApi('/me', {
+          method: 'PATCH',
+          body: JSON.stringify({ shohibulName: newName }),
+        });
+        currentShohibulName = res.shohibulName;
+        document.getElementById('sohibul-name').textContent = res.shohibulName;
+        document.getElementById('greeting').textContent = `👋 ${res.shohibulName.split(/[\s\n]+/)[0]}`;
+        cancelEditSohibul();
+      } catch (e) {
+        showEditError(e.message);
+      } finally {
+        btn.textContent = '💾 Simpan';
+        btn.disabled = false;
+      }
+    }
+
     async function init() {
       try {
-        const [profile, formResponses] = await Promise.all([
+        const [profile, formResponses, animals] = await Promise.all([
           portalApi('/me'),
           portalApi('/form-response'),
+          portalApi('/animals'),
         ]);
+        currentShohibulName = profile.shohibulName || profile.name;
         renderProfile(profile);
         renderFormResponse(formResponses);
+        renderAnimals(animals, profile.animalType);
       } catch (e) {
         if (e.message !== 'Session expired') {
           document.getElementById('form-response-content').innerHTML =

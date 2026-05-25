@@ -8,24 +8,37 @@ export class WaNotifierService {
   private readonly targetPhone = process.env.WA_NOTIFY_PHONE;
 
   send(message: string): void {
-    if (!this.baseUrl || !this.apiKey || !this.targetPhone) {
-      this.logger.warn('WA notifier not configured, skipping');
+    if (!this.targetPhone) {
+      this.logger.warn('WA_NOTIFY_PHONE not set, skipping');
       return;
     }
-    fetch(`${this.baseUrl}/send`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': this.apiKey,
-      },
-      body: JSON.stringify({ to: this.targetPhone, message }),
-    })
-      .then(async (res) => {
-        if (!res.ok) {
-          const text = await res.text();
-          this.logger.error(`WA send failed ${res.status}: ${text}`);
-        }
-      })
-      .catch((e) => this.logger.error(`WA send error: ${e.message}`));
+    this.sendTo(this.targetPhone, message);
+  }
+
+  async sendTo(phone: string, message: string): Promise<boolean> {
+    if (!this.baseUrl || !this.apiKey) {
+      this.logger.warn('WA notifier not configured, skipping');
+      return false;
+    }
+    try {
+      const res = await fetch(`${this.baseUrl}/send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': this.apiKey,
+        },
+        body: JSON.stringify({ to: phone, message }),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        this.logger.error(`WA send to ${phone} failed ${res.status}: ${text}`);
+        return false;
+      }
+      return true;
+    } catch (e) {
+      const err = e as Error;
+      this.logger.error(`[wa-notifier.sendTo] ${err.stack || err.message}`);
+      return false;
+    }
   }
 }
