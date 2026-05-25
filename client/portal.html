@@ -114,11 +114,14 @@
       btn.textContent = 'Mengirim kode...';
       btn.disabled = true;
       hideError();
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 20000);
       try {
         const res = await fetch('/api/portal/auth/request-otp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ phone }),
+          signal: controller.signal,
         });
         const data = await res.json();
         if (!res.ok) {
@@ -131,8 +134,13 @@
         document.getElementById('step-otp').style.display = 'block';
         setTimeout(() => document.getElementById('otp-code').focus(), 100);
       } catch (e) {
-        showError('Gagal terhubung ke server. Coba lagi.');
+        if (e.name === 'AbortError') {
+          showError('Server lambat merespon. Coba lagi.');
+        } else {
+          showError('Gagal terhubung ke server. Coba lagi.');
+        }
       } finally {
+        clearTimeout(timeoutId);
         btn.textContent = 'Kirim Kode OTP →';
         btn.disabled = false;
       }

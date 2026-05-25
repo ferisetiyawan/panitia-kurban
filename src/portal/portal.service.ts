@@ -125,13 +125,15 @@ export class PortalService {
       `Kode Anda: *${code}*\n\n` +
       `Berlaku 5 menit. Jangan bagikan kode ini ke siapa pun.\n` +
       `Jika bukan Anda yang meminta, abaikan pesan ini.`;
-    // wa-bot requires international format (628xxx), not local (08xxx)
-    const sent = await this.waNotifier.sendTo(form2, message);
-    if (!sent) {
-      this.logger.warn(
-        `[portal.requestOtp] WA send failed for ${form2}, OTP still issued`,
-      );
-    }
+    // Fire-and-forget: don't block response on wa-bot delivery.
+    // wa-bot requires international format (628xxx), not local (08xxx).
+    this.waNotifier.sendTo(form2, message).then((sent) => {
+      if (!sent) {
+        this.logger.warn(
+          `[portal.requestOtp] WA send failed for ${form2}, OTP still issued`,
+        );
+      }
+    });
 
     return {
       message: `Kode OTP dikirim ke WhatsApp ${form1.replace(/(\d{4})\d+(\d{3})/, '$1***$2')}`,
