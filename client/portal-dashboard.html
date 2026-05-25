@@ -17,7 +17,7 @@
     <div style="display:flex; align-items:center; justify-content:space-between; padding:16px 0 24px;">
       <div>
         <div style="font-size:20px; font-weight:800; color:#f0fdf4;" id="greeting">🕌 Portal Sohibul</div>
-        <div style="font-size:12px; color:#6b7280;">Masjid Al Hijrah CGE</div>
+        <div style="font-size:12px; color:#9ca3af;">Masjid Al Hijrah CGE</div>
       </div>
       <button onclick="doLogout()" style="background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); color:#fca5a5; border-radius:8px; padding:8px 14px; font-size:13px; cursor:pointer;">
         Keluar
@@ -28,7 +28,7 @@
     <div class="card mb-4" id="card-status" style="display:none;">
       <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap;">
         <div>
-          <div style="font-size:11px; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">Nomor Registrasi</div>
+          <div style="font-size:11px; font-weight:700; color:#9ca3af; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">Nomor Registrasi</div>
           <div style="font-family:monospace; font-size:18px; font-weight:800; color:#10b981;" id="reg-number">-</div>
         </div>
         <div id="status-badge"></div>
@@ -39,7 +39,7 @@
       <!-- Sohibul name (full-width, multi-line, editable) -->
       <div style="margin-bottom:16px;">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
-          <div style="font-size:11px; color:#6b7280;">Nama Sohibul (yang dicantumkan saat penyembelihan)</div>
+          <div style="font-size:11px; color:#9ca3af;">Nama Sohibul (yang dicantumkan saat penyembelihan)</div>
           <button onclick="openEditSohibul()" id="btn-edit-sohibul" style="background:none; border:1px solid rgba(110,231,183,0.3); color:#6ee7b7; border-radius:6px; padding:3px 10px; font-size:11px; cursor:pointer;">
             ✏️ Edit
           </button>
@@ -49,7 +49,7 @@
         <!-- Edit form (hidden by default) -->
         <div id="sohibul-edit-form" style="display:none; margin-top:10px;">
           <textarea id="sohibul-edit-input" class="input-field" rows="6" style="width:100%; resize:vertical; font-family:inherit;" placeholder="Tulis satu nama per baris..."></textarea>
-          <div style="font-size:11px; color:#6b7280; margin-top:6px;">Tip: tulis 1 nama per baris untuk daftar sohibul keluarga.</div>
+          <div style="font-size:11px; color:#9ca3af; margin-top:6px;">Tip: tulis 1 nama per baris untuk daftar sohibul keluarga.</div>
           <div id="sohibul-edit-error" style="display:none; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); border-radius:6px; padding:8px 12px; color:#fca5a5; font-size:12px; margin-top:8px;"></div>
           <div style="display:flex; gap:8px; margin-top:10px;">
             <button onclick="saveSohibulName()" id="btn-save-sohibul" class="btn-primary" style="flex:1; padding:8px;">💾 Simpan</button>
@@ -60,19 +60,19 @@
 
       <div class="grid grid-cols-2 gap-4">
         <div>
-          <div style="font-size:11px; color:#6b7280; margin-bottom:2px;">Nama Pendaftar</div>
+          <div style="font-size:11px; color:#9ca3af; margin-bottom:2px;">Nama Pendaftar</div>
           <div style="font-size:13px; color:#9ca3af;" id="pendaftar-name">-</div>
         </div>
         <div>
-          <div style="font-size:11px; color:#6b7280; margin-bottom:2px;">Jenis Hewan</div>
+          <div style="font-size:11px; color:#9ca3af; margin-bottom:2px;">Jenis Hewan</div>
           <div style="font-size:14px; font-weight:600; color:#f0fdf4;" id="animal-type">-</div>
         </div>
         <div>
-          <div style="font-size:11px; color:#6b7280; margin-bottom:2px;">Event Kurban</div>
+          <div style="font-size:11px; color:#9ca3af; margin-bottom:2px;">Event Kurban</div>
           <div style="font-size:13px; color:#9ca3af;" id="event-name">-</div>
         </div>
         <div>
-          <div style="font-size:11px; color:#6b7280; margin-bottom:2px;">Jenis Pembelian</div>
+          <div style="font-size:11px; color:#9ca3af; margin-bottom:2px;">Jenis Pembelian</div>
           <div style="font-size:13px; color:#9ca3af;" id="purchase-type">-</div>
         </div>
       </div>
@@ -93,7 +93,7 @@
     <!-- Hewan Saya Card -->
     <div class="card mb-4" id="card-animals" style="display:none;">
       <div style="font-size:14px; font-weight:700; color:#f0fdf4; margin-bottom:4px;">🐄 Hewan Qurban Saya</div>
-      <div style="font-size:12px; color:#6b7280; margin-bottom:16px;" id="animals-subtitle">Hewan yang teralokasikan untuk pendaftaran Anda</div>
+      <div style="font-size:12px; color:#9ca3af; margin-bottom:16px;" id="animals-subtitle">Hewan yang teralokasikan untuk pendaftaran Anda</div>
       <div id="animals-content">
         <div style="color:#9ca3af; font-size:13px;">Memuat...</div>
       </div>
@@ -102,7 +102,7 @@
     <!-- Form Response Card -->
     <div class="card mb-4">
       <div style="font-size:14px; font-weight:700; color:#f0fdf4; margin-bottom:4px;">📋 Konfirmasi Teknis</div>
-      <div style="font-size:12px; color:#6b7280; margin-bottom:16px;">Data dari formulir konfirmasi penyembelihan</div>
+      <div style="font-size:12px; color:#9ca3af; margin-bottom:16px;">Data dari formulir konfirmasi penyembelihan</div>
       <div id="form-response-content">
         <div style="color:#9ca3af; font-size:13px;">Memuat...</div>
       </div>
@@ -111,7 +111,7 @@
     <!-- Download Report -->
     <div class="card mb-4">
       <div style="font-size:14px; font-weight:700; color:#f0fdf4; margin-bottom:4px;">📄 Laporan PDF</div>
-      <div style="font-size:12px; color:#6b7280; margin-bottom:16px;">Download ringkasan data pendaftaran dan konfirmasi teknis Anda</div>
+      <div style="font-size:12px; color:#9ca3af; margin-bottom:16px;">Download ringkasan data pendaftaran dan konfirmasi teknis Anda</div>
       <button onclick="downloadReport()" class="btn-primary" style="width:100%;" id="btn-pdf">
         ⬇️ Download Laporan PDF
       </button>
@@ -212,7 +212,7 @@
           <div style="background:rgba(107,114,128,0.1); border-radius:8px; padding:14px; text-align:center;">
             <div style="font-size:24px; margin-bottom:8px;">📝</div>
             <div style="color:#9ca3af; font-size:13px;">Belum ada data konfirmasi teknis.</div>
-            <div style="color:#6b7280; font-size:12px; margin-top:4px;">Isi formulir konfirmasi yang dibagikan panitia.</div>
+            <div style="color:#9ca3af; font-size:12px; margin-top:4px;">Isi formulir konfirmasi yang dibagikan panitia.</div>
           </div>`;
         return;
       }
@@ -227,8 +227,8 @@
           </div>`).join('');
         return `
           <div style="margin-bottom:16px;">
-            <div style="font-size:11px; color:#6b7280; margin-bottom:8px;">Disubmit ${date}</div>
-            ${rows || '<div style="color:#6b7280; font-size:12px;">Tidak ada data</div>'}
+            <div style="font-size:11px; color:#9ca3af; margin-bottom:8px;">Disubmit ${date}</div>
+            ${rows || '<div style="color:#9ca3af; font-size:12px;">Tidak ada data</div>'}
           </div>`;
       }).join('');
     }
@@ -287,7 +287,7 @@
           <div style="background:rgba(107,114,128,0.1); border-radius:8px; padding:14px; text-align:center;">
             <div style="font-size:24px; margin-bottom:8px;">🐄</div>
             <div style="color:#9ca3af; font-size:13px;">Belum ada hewan teralokasikan.</div>
-            <div style="color:#6b7280; font-size:12px; margin-top:4px;">Hewan akan muncul setelah panitia generate.</div>
+            <div style="color:#9ca3af; font-size:12px; margin-top:4px;">Hewan akan muncul setelah panitia generate.</div>
           </div>`;
         return;
       }
@@ -303,7 +303,7 @@
               <div style="font-family:monospace; font-size:13px; font-weight:700; color:#10b981;">${escapeHtml(a.animalCode)}</div>
               <span style="background:${st.bg}; color:${st.color}; border-radius:20px; padding:3px 10px; font-size:11px; font-weight:600; white-space:nowrap;">${st.text}</span>
             </div>
-            ${received ? `<div style="font-size:11px; color:#6b7280; margin-top:6px;">Diterima panitia: ${received}</div>` : ''}
+            ${received ? `<div style="font-size:11px; color:#9ca3af; margin-top:6px;">Diterima panitia: ${received}</div>` : ''}
           </div>`;
       }).join('');
     }
