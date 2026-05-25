@@ -59,17 +59,27 @@ export class AnimalsService {
   ): Promise<Pengkurban[]> {
     if (animal.isVendorAnimal) return [];
     if (KOLEKTIF_TYPES.includes(animal.animalType)) {
+      // Kolektif: include pengkurban yg CONFIRMED atau PENDING_VERIFICATION
+      // (sudah upload bukti, tinggal verify). PENDING_PAYMENT & REJECTED di-skip.
       return this.pengkurbanRepository.find({
-        where: { eventId: animal.eventId, animalType: animal.animalType as any },
+        where: {
+          eventId: animal.eventId,
+          animalType: animal.animalType as any,
+          status: In(['CONFIRMED', 'PENDING_VERIFICATION']) as any,
+        },
         select: ['id', 'name', 'shohibulName', 'phone'],
       });
     }
     if (animal.pengkurbanId) {
       const p = await this.pengkurbanRepository.findOne({
         where: { id: animal.pengkurbanId },
-        select: ['id', 'name', 'shohibulName', 'phone'],
+        select: ['id', 'name', 'shohibulName', 'phone', 'status'],
       });
-      return p ? [p] : [];
+      // Skip REJECTED/PENDING_PAYMENT — kartu/notif buat status itu ga relevan
+      if (!p) return [];
+      const status = (p as any).status;
+      if (status === 'REJECTED' || status === 'PENDING_PAYMENT') return [];
+      return [p];
     }
     return [];
   }
@@ -152,7 +162,11 @@ export class AnimalsService {
 
     if (KOLEKTIF_TYPES.includes(animal.animalType)) {
       const list = await this.pengkurbanRepository.find({
-        where: { eventId: animal.eventId, animalType: animal.animalType as any },
+        where: {
+          eventId: animal.eventId,
+          animalType: animal.animalType as any,
+          status: In(['CONFIRMED', 'PENDING_VERIFICATION']) as any,
+        },
         select: ['id', 'name', 'shohibulName'],
       });
       return list.flatMap((p) => splitNames(p.shohibulName || p.name));
@@ -161,9 +175,13 @@ export class AnimalsService {
     if (animal.pengkurbanId) {
       const p = await this.pengkurbanRepository.findOne({
         where: { id: animal.pengkurbanId },
-        select: ['id', 'name', 'shohibulName'],
+        select: ['id', 'name', 'shohibulName', 'status'],
       });
-      if (p) return splitNames(p.shohibulName || p.name);
+      // Skip REJECTED/PENDING_PAYMENT
+      if (!p) return [];
+      const status = (p as any).status;
+      if (status === 'REJECTED' || status === 'PENDING_PAYMENT') return [];
+      return splitNames(p.shohibulName || p.name);
     }
 
     return [];
@@ -227,11 +245,18 @@ export class AnimalsService {
     if (!event) throw new NotFoundException('Event tidak ditemukan');
 
     let created = 0;
+    // CONFIRMED + PENDING_VERIFICATION dianggap eligible — sudah upload bukti,
+    // tinggal verify panitia. REJECTED dan PENDING_PAYMENT di-skip.
+    const ELIGIBLE_STATUSES = ['CONFIRMED', 'PENDING_VERIFICATION'];
 
-    // 1. Kolektif types: one animal per type (if not already exists)
+    // 1. Kolektif types: one animal per type (kalau ada minimal 1 pengkurban eligible)
     for (const kolektifType of KOLEKTIF_TYPES) {
       const count = await this.pengkurbanRepository.count({
-        where: { eventId, animalType: kolektifType as any },
+        where: {
+          eventId,
+          animalType: kolektifType as any,
+          status: In(ELIGIBLE_STATUSES) as any,
+        },
       });
       if (count === 0) continue;
 
@@ -254,15 +279,16 @@ export class AnimalsService {
       created++;
     }
 
-    // 2. Individual types: one animal per pengkurban (CONFIRMED status)
+    // 2. Individual types: one animal per eligible pengkurban
+    const individualTypes = ['DOMBA', 'KAMBING', 'SAPI_PERORANGAN', 'SAPI_KOLEKTIF', 'SAPI'];
     const confirmed = await this.pengkurbanRepository.find({
-      where: [
-        { eventId, animalType: 'DOMBA' as any },
-        { eventId, animalType: 'KAMBING' as any },
-        { eventId, animalType: 'SAPI_PERORANGAN' as any },
-        { eventId, animalType: 'SAPI_KOLEKTIF' as any },
-        { eventId, animalType: 'SAPI' as any },
-      ],
+      where: individualTypes.flatMap((animalType) =>
+        ELIGIBLE_STATUSES.map((status) => ({
+          eventId,
+          animalType: animalType as any,
+          status: status as any,
+        })),
+      ),
       withDeleted: false,
     });
 
