@@ -118,10 +118,14 @@
     </div>
 
     <!-- Stats mini -->
-    <div class="grid grid-cols-3 gap-3 mb-4">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
       <div class="glass-card p-3 text-center">
         <div class="text-xl font-bold text-emerald-300" id="v-total">0</div>
         <div class="text-xs text-emerald-300/50">Total</div>
+      </div>
+      <div class="glass-card p-3 text-center">
+        <div class="text-xl font-bold text-orange-300" id="v-distributed">0</div>
+        <div class="text-xs text-emerald-300/50">Diambil</div>
       </div>
       <div class="glass-card p-3 text-center">
         <div class="text-xl font-bold text-blue-300" id="v-claimed">0</div>
@@ -142,6 +146,7 @@
               <th>Kode Voucher</th>
               <th>Tanggal Distribusi</th>
               <th>Status</th>
+              <th>Diambil Oleh</th>
               <th>Aksi</th>
             </tr>
           </thead>
@@ -286,6 +291,7 @@
         const response = await api(`/vouchers${qs}`);
         const stats = await api(`/vouchers/stats${eventId ? '?eventId=' + eventId : ''}`);
         document.getElementById('v-total').textContent = stats.total;
+        document.getElementById('v-distributed').textContent = stats.distributed ?? 0;
         document.getElementById('v-claimed').textContent = stats.claimed;
         document.getElementById('v-active').textContent = stats.active;
 
@@ -297,26 +303,47 @@
         allVoucherIds = vouchers.map(v => v.id);
 
         const tbody = document.getElementById('vouchers-table');
-        if (!vouchers.length) { 
-          tbody.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-emerald-300/40">Tidak ada voucher</td></tr>';
+        if (!vouchers.length) {
+          tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-emerald-300/40">Tidak ada voucher</td></tr>';
         } else {
-          tbody.innerHTML = vouchers.map(v => `<tr>
-            <td class="cb-cell"><input type="checkbox" class="v-checkbox" data-id="${v.id}" ${selectedIds.has(v.id) ? 'checked' : ''} onchange="toggleSelect('${v.id}', this.checked)"></td>
-            <td><span class="font-mono font-bold text-emerald-200">${v.voucherCode}</span></td>
-            <td>
-              <span class="date-clickable" onclick="showInlineDate(this, '${v.id}', '${v.distributionDate ? v.distributionDate.split('T')[0] : ''}')" title="Klik untuk ubah tanggal">
-                ${formatDate(v.distributionDate)}
-              </span>
-            </td>
-            <td><span class="badge badge-${v.status.toLowerCase()}">${
-              v.status === 'ACTIVE' ? 'Aktif' :
-              v.status === 'DISTRIBUTED' ? 'Diambil' :
-              v.status === 'CLAIMED' ? 'Diklaim' : 'Batal'
-            }</span></td>
-            <td><div class="flex gap-1 flex-wrap">
-              ${v.status === 'ACTIVE' ? `<button class="btn-danger btn-sm" onclick="deleteVoucher('${v.id}')">🗑</button>` : ''}
-            </div></td>
-          </tr>`).join('');
+          tbody.innerHTML = vouchers.map(v => {
+            // "Diambil Oleh" — pickup info kalau voucher udah DIAMBIL/CLAIMED
+            const escAttr = (s) => String(s ?? '').replace(/"/g, '&quot;');
+            let pickupHtml = '<span class="text-xs text-emerald-300/30">—</span>';
+            if (v.pickupCluster || v.pickupUnit || v.pickupPhone) {
+              const cluster = v.pickupCluster || '';
+              const unit = v.pickupUnit || '';
+              const phone = v.pickupPhone || '';
+              const pickedAtStr = v.claimedAt
+                ? new Date(v.claimedAt).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                : '';
+              const title = [cluster, unit, phone, pickedAtStr].filter(Boolean).join(' • ');
+              pickupHtml = `
+                <div title="${escAttr(title)}">
+                  <div class="text-sm text-emerald-200">${cluster} ${unit}</div>
+                  ${phone ? `<div class="text-xs text-emerald-300/50">📱 ${phone}</div>` : ''}
+                  ${pickedAtStr ? `<div class="text-xs text-emerald-300/40">${pickedAtStr}</div>` : ''}
+                </div>`;
+            }
+            return `<tr>
+              <td class="cb-cell"><input type="checkbox" class="v-checkbox" data-id="${v.id}" ${selectedIds.has(v.id) ? 'checked' : ''} onchange="toggleSelect('${v.id}', this.checked)"></td>
+              <td><span class="font-mono font-bold text-emerald-200">${v.voucherCode}</span></td>
+              <td>
+                <span class="date-clickable" onclick="showInlineDate(this, '${v.id}', '${v.distributionDate ? v.distributionDate.split('T')[0] : ''}')" title="Klik untuk ubah tanggal">
+                  ${formatDate(v.distributionDate)}
+                </span>
+              </td>
+              <td><span class="badge badge-${v.status.toLowerCase()}">${
+                v.status === 'ACTIVE' ? 'Aktif' :
+                v.status === 'DISTRIBUTED' ? 'Diambil' :
+                v.status === 'CLAIMED' ? 'Diklaim' : 'Batal'
+              }</span></td>
+              <td>${pickupHtml}</td>
+              <td><div class="flex gap-1 flex-wrap">
+                ${v.status === 'ACTIVE' ? `<button class="btn-danger btn-sm" onclick="deleteVoucher('${v.id}')">🗑</button>` : ''}
+              </div></td>
+            </tr>`;
+          }).join('');
         }
         
         updateBulkBar();
