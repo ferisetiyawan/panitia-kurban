@@ -29,9 +29,9 @@
       </button>
     </div>
 
-    <!-- Registration switcher (visible only if user has >1 registration) -->
+    <!-- Registration switcher / counter -->
     <div id="reg-switcher-wrap" style="display:none; margin-bottom:16px;">
-      <label style="font-size:11px; color:#9ca3af; display:block; margin-bottom:4px;">Pilih pendaftaran (Anda punya beberapa):</label>
+      <label style="font-size:11px; color:#9ca3af; display:block; margin-bottom:4px;" id="reg-switcher-label">Pilih pendaftaran:</label>
       <select id="reg-switcher" onchange="switchRegistration(this.value)" class="input-field" style="background:rgba(255,255,255,0.07);">
       </select>
     </div>
@@ -375,13 +375,16 @@
         localStorage.setItem('portalUser', JSON.stringify(res.pengkurban));
         window.location.reload();
       } catch (e) {
-        alert('Gagal switch pendaftaran: ' + e.message);
+        console.error('[switchRegistration]', e);
+        alert('Gagal switch pendaftaran: ' + (e?.message || e) + '\n\nCoba refresh halaman (Cmd+Shift+R).');
       }
     }
 
     function renderRegSwitcher(regs, currentId) {
       if (!regs || regs.length <= 1) return;
       const sel = document.getElementById('reg-switcher');
+      const label = document.getElementById('reg-switcher-label');
+      label.textContent = `Anda punya ${regs.length} pendaftaran — pilih untuk pindah:`;
       sel.innerHTML = regs.map(r => `
         <option value="${r.id}" ${r.id === currentId ? 'selected' : ''}>
           ${escapeHtml(r.registrationNumber)} — ${escapeHtml(r.animalLabel)} (${escapeHtml(r.statusLabel)})
