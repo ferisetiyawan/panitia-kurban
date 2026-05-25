@@ -30,6 +30,8 @@ export class VouchersController {
     @Query('status') status?: string,
     @Query('search') search?: string,
     @Query('distributionDate') distributionDate?: string,
+    @Query('pickupCluster') pickupCluster?: string,
+    @Query('pickupSearch') pickupSearch?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
@@ -42,6 +44,8 @@ export class VouchersController {
       distributionDate,
       pageNum,
       limitNum,
+      pickupCluster,
+      pickupSearch,
     );
   }
 

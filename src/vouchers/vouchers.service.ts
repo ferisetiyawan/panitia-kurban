@@ -35,6 +35,8 @@ export class VouchersService {
     distributionDate?: string,
     page?: number,
     limit?: number,
+    pickupCluster?: string,
+    pickupSearch?: string,
   ): Promise<any> {
     const qb = this.vouchersRepository
       .createQueryBuilder('v')
@@ -56,6 +58,15 @@ export class VouchersService {
       qb.andWhere('v.distribution_date = :distributionDate', {
         distributionDate,
       });
+    }
+    if (pickupCluster) {
+      qb.andWhere('v.pickup_cluster = :pickupCluster', { pickupCluster });
+    }
+    if (pickupSearch) {
+      qb.andWhere(
+        '(v.pickup_unit ILIKE :pickupSearch OR v.pickup_phone ILIKE :pickupSearch OR v.pickup_cluster ILIKE :pickupSearch)',
+        { pickupSearch: `%${pickupSearch}%` },
+      );
     }
 
     if (page && limit) {

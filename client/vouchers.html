@@ -98,8 +98,18 @@
       </select>
       <input type="date" id="date-filter" class="input-field" style="max-width:170px" onchange="loadVouchers()"
         title="Filter tanggal distribusi">
-      <input type="text" id="search-input" class="input-field" style="max-width:220px"
+      <input type="text" id="search-input" class="input-field" style="max-width:200px"
         placeholder="🔍 Cari kode voucher..." oninput="debounceSearch()">
+      <select id="pickup-cluster-filter" class="input-field" style="max-width:160px" onchange="loadVouchers()" title="Filter cluster pengambil">
+        <option value="">Semua Cluster</option>
+        <option value="MARGATA">MARGATA</option>
+        <option value="NAHARA">NAHARA</option>
+        <option value="UENOS">UENOS</option>
+        <option value="LAINNYA">LAINNYA</option>
+      </select>
+      <input type="text" id="pickup-search" class="input-field" style="max-width:200px"
+        placeholder="🔍 Cari unit/HP pengambil..." oninput="debounceSearch()"
+        title="Cari di pickup unit atau no HP">
       <div class="flex gap-2 ml-auto">
         <button class="btn-secondary" onclick="exportCsv()">📥 Export CSV</button>
         <button class="btn-secondary" onclick="downloadBatchPdf()">📄 Download Seluruh Kupon</button>
@@ -279,11 +289,15 @@
       const status = document.getElementById('status-filter').value;
       const search = document.getElementById('search-input').value;
       const distributionDate = document.getElementById('date-filter').value;
+      const pickupCluster = document.getElementById('pickup-cluster-filter').value;
+      const pickupSearch = document.getElementById('pickup-search').value;
       let params = [];
-      if (eventId) params.push(`eventId=${eventId}`);
-      if (status) params.push(`status=${status}`);
-      if (search) params.push(`search=${search}`);
-      if (distributionDate) params.push(`distributionDate=${distributionDate}`);
+      if (eventId) params.push(`eventId=${encodeURIComponent(eventId)}`);
+      if (status) params.push(`status=${encodeURIComponent(status)}`);
+      if (search) params.push(`search=${encodeURIComponent(search)}`);
+      if (distributionDate) params.push(`distributionDate=${encodeURIComponent(distributionDate)}`);
+      if (pickupCluster) params.push(`pickupCluster=${encodeURIComponent(pickupCluster)}`);
+      if (pickupSearch) params.push(`pickupSearch=${encodeURIComponent(pickupSearch)}`);
       params.push(`page=${currentPage}`);
       params.push(`limit=${itemsPerPage}`);
       const qs = params.length ? '?' + params.join('&') : '';
