@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
@@ -13,6 +14,7 @@ import * as path from 'path';
 import { Animal } from './animal.entity';
 import { Event } from '../events/event.entity';
 import { Pengkurban } from '../pengkurban/pengkurban.entity';
+import { WaNotifierService } from '../common/notifications/wa-notifier.service';
 
 const KOLEKTIF_TYPES = [
   'SAPI_KOLEKTIF_A',
@@ -35,6 +37,8 @@ const ANIMAL_LABELS: Record<string, string> = {
 
 @Injectable()
 export class AnimalsService {
+  private readonly logger = new Logger(AnimalsService.name);
+
   constructor(
     @InjectRepository(Animal)
     private animalsRepository: Repository<Animal>,
@@ -42,7 +46,68 @@ export class AnimalsService {
     private eventsRepository: Repository<Event>,
     @InjectRepository(Pengkurban)
     private pengkurbanRepository: Repository<Pengkurban>,
+    private waNotifier: WaNotifierService,
   ) {}
+
+  /**
+   * Return all pengkurban linked to an animal (with phone normalized).
+   * For individual animals: 1 pengkurban via pengkurban_id.
+   * For kolektif: all pengkurban with same animal_type + event_id.
+   */
+  private async getPengkurbanForAnimal(
+    animal: Animal,
+  ): Promise<Pengkurban[]> {
+    if (animal.isVendorAnimal) return [];
+    if (KOLEKTIF_TYPES.includes(animal.animalType)) {
+      return this.pengkurbanRepository.find({
+        where: { eventId: animal.eventId, animalType: animal.animalType as any },
+        select: ['id', 'name', 'shohibulName', 'phone'],
+      });
+    }
+    if (animal.pengkurbanId) {
+      const p = await this.pengkurbanRepository.findOne({
+        where: { id: animal.pengkurbanId },
+        select: ['id', 'name', 'shohibulName', 'phone'],
+      });
+      return p ? [p] : [];
+    }
+    return [];
+  }
+
+  private normalizePhoneToInternational(raw: string | null | undefined): string | null {
+    if (!raw) return null;
+    const clean = raw.replace(/\D/g, '');
+    if (!clean) return null;
+    let base = clean;
+    if (base.startsWith('62')) return base; // already 628xxx
+    if (base.startsWith('0')) return '62' + base.slice(1);
+    return '62' + base;
+  }
+
+  /** Fire-and-forget WA notif ke semua sohibul yg terkait sebuah hewan. */
+  private async notifySohibulOnAnimal(
+    animal: Animal,
+    message: string,
+  ): Promise<void> {
+    const pengkurbans = await this.getPengkurbanForAnimal(animal);
+    const sent = new Set<string>();
+    for (const p of pengkurbans) {
+      const phone = this.normalizePhoneToInternational(p.phone);
+      if (!phone) {
+        this.logger.warn(
+          `[animals.notify] skip ${p.id} (${p.name}) — no phone`,
+        );
+        continue;
+      }
+      if (sent.has(phone)) continue; // dedup kalau 1 phone untuk beberapa reg
+      sent.add(phone);
+      this.waNotifier.sendTo(phone, message).then((ok) => {
+        if (!ok) {
+          this.logger.warn(`[animals.notify] WA fail to ${phone}`);
+        }
+      });
+    }
+  }
 
   private generateAnimalCode(): string {
     // Get hijri year from today
@@ -273,6 +338,19 @@ export class AnimalsService {
     if (notes) animal.notes = notes;
 
     const saved = await this.animalsRepository.save(animal);
+
+    const label = this.getAnimalLabel(saved.animalType);
+    const msg =
+      `🐄 *Hewan Qurban Anda Diterima Panitia*\n\n` +
+      `${label} dengan kode *${saved.animalCode}* sudah tercatat diterima oleh panitia kurban Masjid Al Hijrah CGE.\n\n` +
+      `Anda bisa cek detail dan foto hewan (kalau ada) di portal sohibul:\n` +
+      `https://kurban.masjidalhijrahcge.id/portal.html\n\n` +
+      `Login pakai nomor WA ini, kami kirim kode OTP.\n\n` +
+      `_Pesan otomatis sistem panitia kurban._`;
+    this.notifySohibulOnAnimal(saved, msg).catch((e) =>
+      this.logger.error(`[animals.receive notif] ${e?.message || e}`),
+    );
+
     return {
       ...saved,
       sohibulNames: await this.getSohibulNames(saved),
@@ -286,8 +364,25 @@ export class AnimalsService {
     if (!animal) throw new NotFoundException('Hewan tidak ditemukan');
 
     const current = animal.photos || [];
+    const isFirstPhoto = current.length === 0;
     animal.photos = [...current, filename];
     const saved = await this.animalsRepository.save(animal);
+
+    // Hanya notif WA saat foto PERTAMA ditambah — untuk tiap upload foto berikutnya
+    // jangan spam. Sohibul bisa lihat semua foto via portal.
+    if (isFirstPhoto) {
+      const label = this.getAnimalLabel(saved.animalType);
+      const msg =
+        `📸 *Foto Hewan Qurban Anda Tersedia*\n\n` +
+        `${label} dengan kode *${saved.animalCode}* sekarang ada fotonya — bisa dilihat di portal sohibul.\n\n` +
+        `https://kurban.masjidalhijrahcge.id/portal.html\n\n` +
+        `Login pakai nomor WA ini, kami kirim kode OTP.\n\n` +
+        `_Pesan otomatis sistem panitia kurban._`;
+      this.notifySohibulOnAnimal(saved, msg).catch((e) =>
+        this.logger.error(`[animals.addPhoto notif] ${e?.message || e}`),
+      );
+    }
+
     return {
       ...saved,
       sohibulNames: await this.getSohibulNames(saved),
