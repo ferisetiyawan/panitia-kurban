@@ -44,7 +44,7 @@ const isProduction = process.env.NODE_ENV === 'production';
         ? process.env.DB_NAME || 'panitia_kurban'
         : undefined,
       autoLoadEntities: true,
-      synchronize: true, // Auto-create tables in dev
+      synchronize: process.env.DB_SYNCHRONIZE !== 'false', // Set DB_SYNCHRONIZE=false to skip schema sync
       ssl: isProduction,
       extra: isProduction
         ? {
