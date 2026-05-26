@@ -126,18 +126,21 @@ describe('assignSlots', () => {
 });
 
 describe('extractPermintaan', () => {
-  it('extracts all 4 fields from full form data', () => {
+  it('extracts all 5 fields from full form data', () => {
     const data = {
       'Hak daging qurban untuk Sohibul Qurban': 'Ambil Hak Paha Kanan untuk hewan qurban perorangan',
       'Permintaan khusus untuk bagian tertentu untuk Sohibul Qurban': 'Kaki, Ekor',
       'Catatan pengambilan hak sebagian': 'Paha kanan 4kg',
       'Catatan Khusus untuk Panitia': 'Tolong bagian has dalam',
+      'Apakah Anda berkenan menghadiahkan sebagian daging untuk acara makan malam bersama Warga Maranos?':
+        'Berkenan — silakan panitia ambil sesuai kebutuhan',
     };
     expect(extractPermintaan(data)).toEqual({
       hak: 'Ambil Hak Paha Kanan untuk hewan qurban perorangan',
       permintaanKhusus: 'Kaki, Ekor',
       catatanSebagian: 'Paha kanan 4kg',
       catatanPanitia: 'Tolong bagian has dalam',
+      maranos: 'Berkenan — silakan panitia ambil sesuai kebutuhan',
       kehadiran: null,
     });
   });
@@ -148,6 +151,7 @@ describe('extractPermintaan', () => {
       permintaanKhusus: '',
       catatanSebagian: '',
       catatanPanitia: '',
+      maranos: '',
       kehadiran: null,
     });
   });
@@ -158,8 +162,17 @@ describe('extractPermintaan', () => {
       permintaanKhusus: '',
       catatanSebagian: '',
       catatanPanitia: '',
+      maranos: '',
       kehadiran: null,
     });
+  });
+
+  it('extracts maranos field by prefix', () => {
+    const data = {
+      'Apakah Anda berkenan menghadiahkan sebagian daging untuk acara makan malam bersama Warga Maranos?':
+        'Tidak berkenan',
+    };
+    expect(extractPermintaan(data).maranos).toBe('Tidak berkenan');
   });
 
   it('extracts kehadiran=hadir from "Saya akan hadir langsung"', () => {
@@ -194,7 +207,7 @@ describe('extractPermintaan', () => {
 });
 
 describe('summarizePermintaan', () => {
-  const empty: Permintaan = { hak: '', permintaanKhusus: '', catatanSebagian: '', catatanPanitia: '' };
+  const empty: Permintaan = { hak: '', permintaanKhusus: '', catatanSebagian: '', catatanPanitia: '', maranos: '' };
 
   it('returns dash for all-empty', () => {
     expect(summarizePermintaan([empty])).toBe('—');

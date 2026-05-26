@@ -152,6 +152,8 @@ export interface Permintaan {
   permintaanKhusus: string;
   catatanSebagian: string;
   catatanPanitia: string;
+  /** Raw "berkenan / tidak berkenan" jawaban kontribusi daging Maranos */
+  maranos: string;
   name?: string;
   /** 'hadir' = akan datang; 'tidak_hadir' = minta foto/video; null = belum isi form */
   kehadiran?: 'hadir' | 'tidak_hadir' | null;
@@ -170,6 +172,7 @@ export function extractPermintaan(
     permintaanKhusus: findByPrefix(d, 'Permintaan khusus').trim(),
     catatanSebagian: findByPrefix(d, 'Catatan pengambilan').trim(),
     catatanPanitia: findByPrefix(d, 'Catatan Khusus untuk Panitia').trim(),
+    maranos: findByPrefix(d, 'Apakah Anda berkenan menghadiahkan').trim(),
     kehadiran,
   };
 }

@@ -20,6 +20,7 @@ describe('SchedulingSesetPdfService', () => {
             permintaanKhusus: 'Kaki',
             catatanSebagian: '',
             catatanPanitia: '',
+            maranos: 'Berkenan',
           }],
         },
       ]),
