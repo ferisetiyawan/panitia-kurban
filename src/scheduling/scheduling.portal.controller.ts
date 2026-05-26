@@ -1,9 +1,19 @@
-import { Controller, Get, UseGuards, Request, Logger } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  UseGuards,
+  Request,
+  Logger,
+  Query,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, Not, IsNull } from 'typeorm';
 import { PortalJwtGuard } from '../portal/portal-jwt.guard';
 import { Animal } from '../animals/animal.entity';
 import { Pengkurban } from '../pengkurban/pengkurban.entity';
+import { SchedulingService } from './scheduling.service';
+import type { Team } from './scheduling.service';
 
 const KOLEKTIF_TYPES = ['SAPI_KOLEKTIF_A', 'SAPI_KOLEKTIF_B', 'SAPI_KOLEKTIF_C'];
 
@@ -16,7 +26,22 @@ export class SchedulingPortalController {
     private readonly animalRepo: Repository<Animal>,
     @InjectRepository(Pengkurban)
     private readonly pengkurbanRepo: Repository<Pengkurban>,
+    private readonly schedulingService: SchedulingService,
   ) {}
+
+  /**
+   * PUBLIC (no auth) ops snapshot — read-only view-friendly endpoint for
+   * /operasional.html when accessed by general public (sohibul or visitor).
+   * Returns same shape as the authenticated /api/scheduling/ops endpoint.
+   */
+  @Get('ops-public')
+  async opsPublic(
+    @Query('eventId') eventId: string,
+    @Query('team') team: Team,
+  ) {
+    if (!eventId || !team) throw new BadRequestException('eventId + team required');
+    return this.schedulingService.getOpsData(eventId, team);
+  }
 
   @Get('me')
   @UseGuards(PortalJwtGuard)

@@ -23,7 +23,7 @@ export class SchedulingSesetPdfService {
       doc.on('error', reject);
 
       doc.fontSize(16).text('Cheat Sheet Tim Seset — 1447H', { align: 'center' });
-      doc.fontSize(9).text('Masjid Al Hijrah CGE', { align: 'center' });
+      doc.fontSize(9).text('Panitia Kurban', { align: 'center' });
       doc.moveDown();
 
       let isFirst = true;

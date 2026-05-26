@@ -47,6 +47,14 @@
       <div id="user-info" class="user-info"></div>
     </div>
 
+    <!-- Public-mode nav: shown when not logged in -->
+    <div id="publicNav" class="hidden flex flex-wrap items-center gap-2 mb-3">
+      <a href="/login.html" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-sm">🔑 Login Panitia</a>
+      <a href="/daftar.html" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded text-sm">📝 Daftar Kurban</a>
+      <a href="/portal.html" class="bg-gray-200 hover:bg-gray-300 text-gray-900 px-3 py-1.5 rounded text-sm">🏠 Portal Sohibul</a>
+      <span class="text-xs text-gray-300 ml-2">View-only mode</span>
+    </div>
+
     <div class="flex flex-wrap items-center gap-2 mb-4">
       <select id="eventSelect" class="border rounded p-2 bg-white text-gray-900"></select>
       <select id="teamSelect" class="border rounded p-2 bg-white text-gray-900">
@@ -94,10 +102,21 @@
   <script src="/js/app.js"></script>
   <script>
     (async () => {
-      if (!requireAuth()) return;
-      initSidebar('operasional');
-
       const $ = (s) => document.querySelector(s);
+      const isLoggedIn = !!localStorage.getItem('token');
+      if (isLoggedIn) {
+        initSidebar('operasional');
+      } else {
+        // Public mode: hide sidebar + bottom nav, show top-link bar
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar) sidebar.style.display = 'none';
+        const bn = document.getElementById('bottom-nav');
+        if (bn) bn.style.display = 'none';
+        const main = document.querySelector('.main-content');
+        if (main) main.style.marginLeft = '0';
+        $('#publicNav').classList.remove('hidden');
+      }
+
       let currentEventId = null;
       let currentTeam = 'SAPI';
       let autoRefreshTimer = null;
@@ -113,13 +132,29 @@
       }
       function getToken() { return localStorage.getItem('token'); }
 
+      // Active event id (Idul Adha 1447H). For public mode we use this directly
+      // without fetching the event list (no public /api/events endpoint).
+      const ACTIVE_EVENT_ID = '100a5311-de13-4e26-8b1d-4cac09ee3bb6';
+
       async function loadEvents() {
-        const events = await api('/events');
         const sel = $('#eventSelect');
-        sel.innerHTML = events.map((e) =>
-          `<option value="${esc(e.id)}">${esc(e.hijriYear ?? e.name ?? e.id)}</option>`
-        ).join('');
-        currentEventId = events[0]?.id;
+        if (isLoggedIn) {
+          try {
+            const events = await api('/events');
+            sel.innerHTML = events.map((e) =>
+              `<option value="${esc(e.id)}">${esc(e.hijriYear ?? e.name ?? e.id)}</option>`
+            ).join('');
+            currentEventId = events[0]?.id;
+          } catch (e) {
+            // Fallback to hardcoded
+            sel.innerHTML = `<option value="${ACTIVE_EVENT_ID}">Idul Adha 1447H</option>`;
+            currentEventId = ACTIVE_EVENT_ID;
+          }
+        } else {
+          sel.innerHTML = `<option value="${ACTIVE_EVENT_ID}">Idul Adha 1447H</option>`;
+          currentEventId = ACTIVE_EVENT_ID;
+          sel.disabled = true;
+        }
         sel.onchange = () => { currentEventId = sel.value; refresh(); };
       }
 
@@ -188,7 +223,14 @@
       async function refresh() {
         if (!currentEventId) return;
         try {
-          const data = await api(`/scheduling/ops?eventId=${encodeURIComponent(currentEventId)}&team=${currentTeam}`);
+          let data;
+          if (isLoggedIn) {
+            data = await api(`/scheduling/ops?eventId=${encodeURIComponent(currentEventId)}&team=${currentTeam}`);
+          } else {
+            const r = await fetch(`/api/portal/scheduling/ops-public?eventId=${encodeURIComponent(currentEventId)}&team=${currentTeam}`);
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            data = await r.json();
+          }
           $('#counts').textContent = `Antri: ${data.waitingCount} • Sedang: ${data.current.length} • Selesai: ${data.doneCount}`;
           $('#currentList').innerHTML = data.current.length
             ? data.current.map(renderCurrentCard).join('')
@@ -200,6 +242,12 @@
             ? data.recent.map(renderDoneCard).join('')
             : '<div class="text-gray-400 italic text-sm">Belum ada yang selesai.</div>';
           attachHandlers();
+          // Hide mutation buttons in public mode
+          if (!isLoggedIn) {
+            document.querySelectorAll('[data-action]').forEach((btn) => {
+              btn.style.display = 'none';
+            });
+          }
         } catch (e) {
           console.error('[ops refresh]', e);
           $('#currentList').innerHTML = `<div class="text-red-400">Gagal load: ${esc(e.message || e)}</div>`;
