@@ -29,7 +29,9 @@ export class SchedulingSesetPdfService {
       let isFirst = true;
       for (const it of items) {
         if (!it.animal.scheduledAt) continue;
-        if (!isFirst && doc.y > doc.page.height - 200) {
+        const estimatedHeight = 16 + Math.max(it.sohibulRequests.length, 1) * 60 + 16;
+        const remainingSpace = doc.page.height - doc.y - 30;
+        if (!isFirst && remainingSpace < estimatedHeight) {
           doc.addPage();
         }
         isFirst = false;
