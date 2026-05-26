@@ -128,8 +128,8 @@ export class SchedulingController {
 
   @Get('ops')
   @Roles(Role.SUPER_ADMIN, Role.KETUA_PANITIA, Role.PANITIA_VOUCHER, Role.PANITIA_SCANNER)
-  async ops(@Query('eventId') eventId: string, @Query('team') team: Team) {
-    if (!eventId || !team) throw new BadRequestException('eventId + team required');
+  async ops(@Query('eventId') eventId: string, @Query('team') team?: Team) {
+    if (!eventId) throw new BadRequestException('eventId required');
     return this.service.getOpsData(eventId, team);
   }
 

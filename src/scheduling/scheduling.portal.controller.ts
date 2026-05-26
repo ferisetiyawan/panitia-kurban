@@ -37,9 +37,9 @@ export class SchedulingPortalController {
   @Get('ops-public')
   async opsPublic(
     @Query('eventId') eventId: string,
-    @Query('team') team: Team,
+    @Query('team') team?: Team,
   ) {
-    if (!eventId || !team) throw new BadRequestException('eventId + team required');
+    if (!eventId) throw new BadRequestException('eventId required');
     return this.schedulingService.getOpsData(eventId, team);
   }
 
