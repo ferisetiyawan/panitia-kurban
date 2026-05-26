@@ -6,6 +6,7 @@ import { FormResponse } from '../form-responses/form-response.entity';
 import { Event } from '../events/event.entity';
 import { NotificationsModule } from '../common/notifications/notifications.module';
 import { SchedulingService } from './scheduling.service';
+import { SchedulingController } from './scheduling.controller';
 
 @Module({
   imports: [
@@ -13,7 +14,7 @@ import { SchedulingService } from './scheduling.service';
     NotificationsModule,
   ],
   providers: [SchedulingService],
-  controllers: [],
+  controllers: [SchedulingController],
   exports: [SchedulingService],
 })
 export class SchedulingModule {}
