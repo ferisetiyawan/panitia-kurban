@@ -262,6 +262,26 @@
         }
       }
 
+      function showOverlay(text) {
+        let overlay = document.getElementById('opOverlay');
+        if (!overlay) {
+          overlay = document.createElement('div');
+          overlay.id = 'opOverlay';
+          overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px);';
+          overlay.innerHTML = '<div style="background:rgba(255,255,255,0.97);color:#0f172a;padding:24px 32px;border-radius:14px;display:flex;align-items:center;gap:14px;font-weight:700;font-size:16px;box-shadow:0 8px 30px rgba(0,0,0,0.4);"><div class="op-spinner"></div><span id="opOverlayText">Memproses…</span></div>';
+          const style = document.createElement('style');
+          style.textContent = `.op-spinner{width:24px;height:24px;border:3px solid #e2e8f0;border-top-color:#10b981;border-radius:50%;animation:opspin 0.7s linear infinite;}@keyframes opspin{to{transform:rotate(360deg);}}`;
+          document.head.appendChild(style);
+          document.body.appendChild(overlay);
+        }
+        document.getElementById('opOverlayText').textContent = text;
+        overlay.style.display = 'flex';
+      }
+      function hideOverlay() {
+        const o = document.getElementById('opOverlay');
+        if (o) o.style.display = 'none';
+      }
+
       function attachHandlers() {
         document.querySelectorAll('[data-action]').forEach((btn) => {
           btn.onclick = async () => {
@@ -273,15 +293,24 @@
             }
             if (action === 'skip' && !confirm('Tunda hewan ini? (sohibul belum datang — tetap bisa di-Lanjutkan nanti dari section Selesai)')) return;
             if (action === 'reset' && !confirm('Kembalikan hewan ke antrian WAITING?')) return;
+            const overlayText = {
+              start: '▶ Memulai... (kirim JIT WA ke next sohibul)',
+              done: '✅ Menandai selesai...',
+              skip: '⏸️ Menunda...',
+              reset: '↩ Mengembalikan ke antrian...',
+            }[action] || 'Memproses…';
             btn.disabled = true;
             btn.style.opacity = '0.5';
+            showOverlay(overlayText);
             try {
               await api(`/scheduling/${encodeURIComponent(id)}/${action}`, { method: 'POST' });
-              refresh();
+              await refresh();
             } catch (e) {
               alert('Gagal: ' + (e.message || e));
               btn.disabled = false;
               btn.style.opacity = '1';
+            } finally {
+              hideOverlay();
             }
           };
         });
