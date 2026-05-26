@@ -21,6 +21,7 @@ import type { Team } from './scheduling.service';
 import { SchedulingBroadcastService, BroadcastTarget } from './scheduling-broadcast.service';
 import type { Response } from 'express';
 import { SchedulingPdfService } from './scheduling-pdf.service';
+import { SchedulingSesetPdfService } from './scheduling-seset-pdf.service';
 
 @Controller('api/scheduling')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -29,6 +30,7 @@ export class SchedulingController {
     private readonly service: SchedulingService,
     private readonly broadcast: SchedulingBroadcastService,
     private readonly pdf: SchedulingPdfService,
+    private readonly sesetPdf: SchedulingSesetPdfService,
   ) {}
 
   @Get()
@@ -107,6 +109,16 @@ export class SchedulingController {
     const buf = await this.pdf.generate(eventId);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="jadwal-${eventId.slice(0, 8)}.pdf"`);
+    res.end(buf);
+  }
+
+  @Get('seset/pdf')
+  @Roles(Role.SUPER_ADMIN, Role.KETUA_PANITIA, Role.PANITIA_VOUCHER, Role.PANITIA_SCANNER)
+  async sesetPdfExport(@Query('eventId') eventId: string, @Res() res: Response) {
+    if (!eventId) throw new BadRequestException('eventId required');
+    const buf = await this.sesetPdf.generate(eventId);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="seset-${eventId.slice(0, 8)}.pdf"`);
     res.end(buf);
   }
 }

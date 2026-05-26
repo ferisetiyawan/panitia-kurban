@@ -8,6 +8,7 @@ import { NotificationsModule } from '../common/notifications/notifications.modul
 import { SchedulingService } from './scheduling.service';
 import { SchedulingBroadcastService } from './scheduling-broadcast.service';
 import { SchedulingPdfService } from './scheduling-pdf.service';
+import { SchedulingSesetPdfService } from './scheduling-seset-pdf.service';
 import { SchedulingController } from './scheduling.controller';
 import { SchedulingPortalController } from './scheduling.portal.controller';
 
@@ -16,7 +17,7 @@ import { SchedulingPortalController } from './scheduling.portal.controller';
     TypeOrmModule.forFeature([Animal, Pengkurban, FormResponse, Event]),
     NotificationsModule,
   ],
-  providers: [SchedulingService, SchedulingBroadcastService, SchedulingPdfService],
+  providers: [SchedulingService, SchedulingBroadcastService, SchedulingPdfService, SchedulingSesetPdfService],
   controllers: [SchedulingController, SchedulingPortalController],
   exports: [SchedulingService],
 })

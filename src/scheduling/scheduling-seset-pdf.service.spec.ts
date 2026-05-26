@@ -1,16 +1,17 @@
 import { Test } from '@nestjs/testing';
-import { SchedulingPdfService } from './scheduling-pdf.service';
+import { SchedulingSesetPdfService } from './scheduling-seset-pdf.service';
 import { SchedulingService } from './scheduling.service';
 
-describe('SchedulingPdfService', () => {
-  it('produces non-empty PDF with Permintaan info', async () => {
-    const schedulingService = {
+describe('SchedulingSesetPdfService', () => {
+  it('produces non-empty PDF buffer', async () => {
+    const svc = {
       getSesetData: jest.fn().mockResolvedValue([
         {
           animal: {
             animalCode: 'ANM-1',
             animalType: 'SAPI_PERORANGAN',
             scheduledAt: new Date('2026-06-06T07:30:00+07:00'),
+            scheduledTeam: 'SAPI',
           },
           sohibulRequests: [{
             name: 'Asep',
@@ -25,11 +26,11 @@ describe('SchedulingPdfService', () => {
     };
     const m = await Test.createTestingModule({
       providers: [
-        SchedulingPdfService,
-        { provide: SchedulingService, useValue: schedulingService },
+        SchedulingSesetPdfService,
+        { provide: SchedulingService, useValue: svc },
       ],
     }).compile();
-    const buf = await m.get(SchedulingPdfService).generate('event-1');
+    const buf = await m.get(SchedulingSesetPdfService).generate('event-1');
     expect(buf.length).toBeGreaterThan(500);
     expect(buf.subarray(0, 4).toString()).toBe('%PDF');
   });

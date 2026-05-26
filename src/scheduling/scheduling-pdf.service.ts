@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { SchedulingService } from './scheduling.service';
+import { summarizePermintaan, Permintaan } from './scheduling-mappers';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const PDFDocument = require('pdfkit');
@@ -13,8 +14,8 @@ export class SchedulingPdfService {
   constructor(private readonly schedulingService: SchedulingService) {}
 
   async generate(eventId: string): Promise<Buffer> {
-    const sapi = await this.schedulingService.getSchedule(eventId, 'SAPI');
-    const kambing = await this.schedulingService.getSchedule(eventId, 'KAMBING_DOMBA');
+    const sapi = await this.schedulingService.getSesetData(eventId, 'SAPI');
+    const kambing = await this.schedulingService.getSesetData(eventId, 'KAMBING_DOMBA');
 
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 40 });
@@ -23,7 +24,6 @@ export class SchedulingPdfService {
       doc.on('end', () => resolve(Buffer.concat(buffers)));
       doc.on('error', reject);
 
-      // Header
       doc.fontSize(18).text('Jadwal Penyembelihan Idul Adha 1447H', { align: 'center' });
       doc.fontSize(10).text('Masjid Al Hijrah CGE', { align: 'center' });
       doc.moveDown();
@@ -36,25 +36,45 @@ export class SchedulingPdfService {
 
       doc.moveDown();
       const tableY = doc.y;
-      const rowH = 16;
-      doc.fontSize(10);
+      const rowH = 24;
 
-      sapi.forEach((it, i) => {
-        if (!it.animal.scheduledAt) return;
-        const time = fmtTime(new Date(it.animal.scheduledAt));
-        const name = it.pengkurban[0]?.name ?? '(vendor)';
-        doc.text(`${time}  ${name}`, 40, tableY + i * rowH, { width: colWidth });
-      });
+      const renderColumn = (
+        items: Array<{ animal: any; sohibulRequests: any[] }>,
+        x: number,
+      ) => {
+        items.forEach((it, i) => {
+          if (!it.animal.scheduledAt) return;
+          const time = fmtTime(new Date(it.animal.scheduledAt));
+          const firstName = it.sohibulRequests[0]?.name ?? '(vendor)';
+          const permItems: Permintaan[] = it.sohibulRequests.map((s: any) => ({
+            hak: s.hak,
+            permintaanKhusus: s.permintaanKhusus,
+            catatanSebagian: s.catatanSebagian,
+            catatanPanitia: s.catatanPanitia,
+            name: it.sohibulRequests.length > 1 ? s.name : undefined,
+          }));
+          const summary = summarizePermintaan(permItems);
+          doc.fontSize(10).fillColor('#000').text(
+            `${time}  ${firstName}`,
+            x,
+            tableY + i * rowH,
+            { width: colWidth },
+          );
+          doc.fontSize(8).fillColor('#666').text(
+            `Permintaan: ${summary}`,
+            x,
+            tableY + i * rowH + 12,
+            { width: colWidth },
+          );
+          doc.fillColor('#000');
+        });
+      };
 
-      kambing.forEach((it, i) => {
-        if (!it.animal.scheduledAt) return;
-        const time = fmtTime(new Date(it.animal.scheduledAt));
-        const name = it.pengkurban[0]?.name ?? '(vendor)';
-        doc.text(`${time}  ${name}`, 40 + colWidth, tableY + i * rowH, { width: colWidth });
-      });
+      renderColumn(sapi, 40);
+      renderColumn(kambing, 40 + colWidth);
 
       const now = new Date();
-      doc.fontSize(8).text(
+      doc.fontSize(8).fillColor('#888').text(
         `Generated ${now.toISOString()}`,
         40,
         doc.page.height - 40,
