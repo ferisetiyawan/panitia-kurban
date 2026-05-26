@@ -7,6 +7,7 @@ import { Event } from '../events/event.entity';
 import { NotificationsModule } from '../common/notifications/notifications.module';
 import { SchedulingService } from './scheduling.service';
 import { SchedulingController } from './scheduling.controller';
+import { SchedulingPortalController } from './scheduling.portal.controller';
 
 @Module({
   imports: [
@@ -14,7 +15,7 @@ import { SchedulingController } from './scheduling.controller';
     NotificationsModule,
   ],
   providers: [SchedulingService],
-  controllers: [SchedulingController],
+  controllers: [SchedulingController, SchedulingPortalController],
   exports: [SchedulingService],
 })
 export class SchedulingModule {}
