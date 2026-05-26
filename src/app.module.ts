@@ -20,6 +20,7 @@ import { RekapModule } from './rekap/rekap.module';
 import { FormResponsesModule } from './form-responses/form-responses.module';
 import { AnimalsModule } from './animals/animals.module';
 import { PortalModule } from './portal/portal.module';
+import { SchedulingModule } from './scheduling/scheduling.module';
 
 import { AppController } from './app.controller';
 
@@ -74,6 +75,7 @@ const isProduction = process.env.NODE_ENV === 'production';
     RekapModule,
     ScheduleModule.forRoot(),
     FormResponsesModule,
+    SchedulingModule,
     AnimalsModule,
     PortalModule,
   ],

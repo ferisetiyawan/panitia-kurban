@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cheat Sheet Seset - Panitia Kurban</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="bg-orb bg-orb-1"></div>
+  <div class="bg-orb bg-orb-2"></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <h1>🕌 Al Hijrah CGE</h1>
+      <p>Sistem Panitia Kurban</p>
+    </div>
+    <nav class="sidebar-nav"></nav>
+  </aside>
+  <nav class="bottom-nav" id="bottom-nav">
+    <div class="bottom-nav-items"></div>
+  </nav>
+
+  <main class="main-content">
+    <div class="top-bar">
+      <div class="flex items-center gap-3">
+        <button class="hamburger" onclick="toggleSidebar()">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+          </svg>
+        </button>
+        <h2 class="page-title">Cheat Sheet Tim Seset</h2>
+      </div>
+      <div id="user-info" class="user-info"></div>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3 mb-4">
+      <select id="eventSelect" class="border rounded p-2 bg-white"></select>
+      <select id="teamFilter" class="border rounded p-2 bg-white">
+        <option value="">Semua tim</option>
+        <option value="SAPI">Tim SAPI</option>
+        <option value="KAMBING_DOMBA">Tim KAMBING/DOMBA</option>
+      </select>
+      <button id="btnPdf" class="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded">📥 Download PDF</button>
+      <button id="btnRefresh" class="bg-blue-100 hover:bg-blue-200 px-4 py-2 rounded">🔄 Refresh</button>
+    </div>
+
+    <div id="content" class="space-y-3"></div>
+  </main>
+
+  <script src="/js/app.js"></script>
+  <script>
+    (async () => {
+      const $ = (s) => document.querySelector(s);
+      let currentEventId = null;
+
+      function fmtTime(iso) {
+        if (!iso) return '—';
+        const d = new Date(iso);
+        return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+      }
+
+      function teamLabel(t) {
+        return t === 'SAPI' ? 'SAPI' : 'KAMBING/DOMBA';
+      }
+
+      function esc(s) {
+        return String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+      }
+
+      function renderCard(it) {
+        if (!it.animal.scheduledAt) return '';
+        const sohibulHtml = it.sohibulRequests.length === 0
+          ? '<p class="text-gray-500 italic">(vendor — tidak ada permintaan)</p>'
+          : it.sohibulRequests.map((s) => `
+            <div class="ml-4 mb-3">
+              <div class="font-semibold">Sohibul: ${esc(s.name)}</div>
+              <div class="text-sm text-gray-700">Hak: ${esc(s.hak) || '—'}</div>
+              <div class="text-sm text-gray-700">Permintaan khusus: ${esc(s.permintaanKhusus) || '—'}</div>
+              <div class="text-sm text-gray-700">Catatan pengambilan: ${esc(s.catatanSebagian) || '—'}</div>
+              <div class="text-sm text-gray-700">Catatan untuk panitia: ${esc(s.catatanPanitia) || '—'}</div>
+            </div>
+          `).join('');
+
+        return `
+          <div class="bg-white p-4 rounded shadow-sm border">
+            <div class="font-mono text-blue-900 font-bold mb-2">
+              ${fmtTime(it.animal.scheduledAt)} • Tim ${teamLabel(it.animal.scheduledTeam)} • ${esc(it.animal.animalCode)} (${esc(it.animal.animalType)})
+            </div>
+            ${sohibulHtml}
+          </div>
+        `;
+      }
+
+      async function loadEvents() {
+        const events = await api('/events');
+        const sel = $('#eventSelect');
+        sel.innerHTML = events.map((e) =>
+          `<option value="${esc(e.id)}">${esc(e.hijriYear ?? e.name ?? e.id)}</option>`
+        ).join('');
+        currentEventId = events[0]?.id;
+        sel.onchange = () => { currentEventId = sel.value; refresh(); };
+      }
+
+      async function refresh() {
+        if (!currentEventId) return;
+        const team = $('#teamFilter').value;
+        const qs = team
+          ? `?eventId=${encodeURIComponent(currentEventId)}&team=${encodeURIComponent(team)}`
+          : `?eventId=${encodeURIComponent(currentEventId)}`;
+        try {
+          const items = await api(`/scheduling/seset${qs}`);
+          $('#content').innerHTML = items.length
+            ? items.map(renderCard).join('')
+            : '<p class="text-gray-500">Belum ada jadwal. Generate dulu di halaman Jadwal Penyembelihan.</p>';
+        } catch (e) {
+          $('#content').innerHTML = `<p class="text-red-600">Gagal memuat: ${esc(e.message || e)}</p>`;
+        }
+      }
+
+      $('#teamFilter').onchange = refresh;
+      $('#btnRefresh').onclick = refresh;
+      $('#btnPdf').onclick = async () => {
+        if (!currentEventId) return;
+        try {
+          const token = localStorage.getItem('token');
+          const res = await fetch(`/api/scheduling/seset/pdf?eventId=${encodeURIComponent(currentEventId)}`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+          });
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.message || `HTTP ${res.status}`);
+          }
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `seset-${currentEventId.slice(0,8)}.pdf`;
+          a.click();
+          URL.revokeObjectURL(url);
+        } catch (e) {
+          alert('Gagal download PDF: ' + (e.message || e));
+        }
+      };
+
+      if (!requireAuth()) return;
+      initSidebar('seset');
+      await loadEvents();
+      await refresh();
+    })();
+  </script>
+</body>
+</html>

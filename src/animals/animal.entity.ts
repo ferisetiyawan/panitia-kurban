@@ -53,6 +53,15 @@ export class Animal {
   @Column({ type: 'varchar', nullable: true })
   notes: string | null;
 
+  @Column({ name: 'scheduled_at', type: 'timestamptz', nullable: true })
+  scheduledAt: Date | null;
+
+  @Column({ name: 'scheduled_team', type: 'varchar', length: 20, nullable: true })
+  scheduledTeam: 'SAPI' | 'KAMBING_DOMBA' | null;
+
+  @Column({ name: 'scheduled_note', type: 'text', nullable: true })
+  scheduledNote: string | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
