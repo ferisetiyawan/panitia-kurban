@@ -319,10 +319,24 @@
         return;
       }
 
+      const SLAUGHTER_STATUS_LABELS = {
+        WAITING:     { text: '⏳ Menunggu giliran', color: '#fcd34d', bg: 'rgba(245,158,11,0.15)' },
+        IN_PROGRESS: { text: '🔥 Sedang dipotong', color: '#fca5a5', bg: 'rgba(239,68,68,0.2)' },
+        DONE:        { text: '✅ Sudah selesai',    color: '#6ee7b7', bg: 'rgba(16,185,129,0.18)' },
+        SKIPPED:     { text: '⏭️ Skipped',          color: '#9ca3af', bg: 'rgba(107,114,128,0.18)' },
+      };
+
       el.innerHTML = animals.map(a => {
         const st = ANIMAL_STATUS_LABELS[a.status] || { text: a.status, color: '#9ca3af', bg: 'rgba(107,114,128,0.12)' };
+        const slaughterSt = a.slaughterStatus ? SLAUGHTER_STATUS_LABELS[a.slaughterStatus] : null;
         const received = a.receivedAt
           ? new Date(a.receivedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+          : null;
+        const startedAt = a.slaughterStartedAt
+          ? new Date(a.slaughterStartedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+          : null;
+        const doneAt = a.slaughterDoneAt
+          ? new Date(a.slaughterDoneAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
           : null;
         const photos = Array.isArray(a.photos) ? a.photos : [];
         const photoHtml = photos.length > 0 ? `
@@ -338,6 +352,7 @@
               <div style="font-family:monospace; font-size:13px; font-weight:700; color:#10b981;">${escapeHtml(a.animalCode)}</div>
               <span style="background:${st.bg}; color:${st.color}; border-radius:20px; padding:3px 10px; font-size:11px; font-weight:600; white-space:nowrap;">${st.text}</span>
             </div>
+            ${slaughterSt ? `<div style="margin-top:6px;"><span style="background:${slaughterSt.bg}; color:${slaughterSt.color}; border-radius:20px; padding:3px 10px; font-size:11px; font-weight:600;">${slaughterSt.text}</span>${startedAt ? ` <span style="font-size:11px; color:#9ca3af;">mulai ${startedAt}</span>` : ''}${doneAt ? ` <span style="font-size:11px; color:#9ca3af;">selesai ${doneAt}</span>` : ''}</div>` : ''}
             ${received ? `<div style="font-size:11px; color:#9ca3af; margin-top:6px;">Diterima panitia: ${received}</div>` : ''}
             ${photoHtml}
           </div>`;

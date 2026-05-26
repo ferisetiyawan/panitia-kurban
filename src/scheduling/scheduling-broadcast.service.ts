@@ -6,6 +6,17 @@ function fmtTime(d: Date): string {
 }
 
 const KOLEKTIF_TYPES = ['SAPI_KOLEKTIF_A', 'SAPI_KOLEKTIF_B', 'SAPI_KOLEKTIF_C'];
+
+/**
+ * Normalize phone to WhatsApp international format (62xxx).
+ * Some wa-bot/WhatsApp send paths hang on 08xxx — use 62 prefix to be safe.
+ */
+function normalizePhoneForWa(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  if (digits.startsWith('62')) return digits;
+  if (digits.startsWith('0')) return '62' + digits.slice(1);
+  return digits;
+}
 const ANIMAL_LABELS: Record<string, string> = {
   SAPI_KOLEKTIF_A: 'Sapi Kolektif A',
   SAPI_KOLEKTIF_B: 'Sapi Kolektif B',
@@ -116,11 +127,15 @@ export class SchedulingBroadcastService {
         `Mohon hadir di area penyembelihan Masjid Al Hijrah CGE sekarang.\n\n` +
         `Jazakumullahu khairan,\nPanitia Kurban`;
       try {
+        const controller = new AbortController();
+        const t = setTimeout(() => controller.abort(), 10000); // 10s timeout
         const res = await fetch(`${url}/send`, {
           method: 'POST',
           headers: { 'content-type': 'application/json', 'x-api-key': key },
-          body: JSON.stringify({ to: s.phone, message }),
+          body: JSON.stringify({ to: normalizePhoneForWa(s.phone), message }),
+          signal: controller.signal,
         });
+        clearTimeout(t);
         if (!res.ok) {
           const txt = await res.text();
           failed.push(`${s.phone}: ${res.status} ${txt}`);
@@ -164,7 +179,7 @@ export class SchedulingBroadcastService {
         const res = await fetch(`${url}/send`, {
           method: 'POST',
           headers: { 'content-type': 'application/json', 'x-api-key': key },
-          body: JSON.stringify({ to: s.phone, message: message(s.name) }),
+          body: JSON.stringify({ to: normalizePhoneForWa(s.phone), message: message(s.name) }),
         });
         if (!res.ok) {
           const txt = await res.text();

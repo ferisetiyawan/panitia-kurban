@@ -138,23 +138,19 @@ export class SchedulingController {
   async startSlaughter(@Param('animalId') animalId: string) {
     const { animal, nextWaitingId } = await this.service.startAnimal(animalId);
     if (nextWaitingId) {
-      try {
-        const nextAnimal = await this.service.findAnimal(nextWaitingId);
-        if (nextAnimal) {
-          const sohibul = await this.service.hadirSohibulPhones(nextAnimal);
-          this.broadcast.sendJitReminder(sohibul, this.animalLabel(nextAnimal))
-            .then((r) => {
-              if (r.failed.length > 0) {
-                console.error('[ops start jit]', r.failed.join('; '));
-              }
-            })
-            .catch((e: any) => {
-              console.error('[ops start jit]', e.stack || e.message);
-            });
+      // Fire-and-forget JIT — don't block HTTP response. Wa-bot may hang.
+      (async () => {
+        try {
+          const nextAnimal = await this.service.findAnimal(nextWaitingId);
+          if (nextAnimal) {
+            const sohibul = await this.service.hadirSohibulPhones(nextAnimal);
+            const result = await this.broadcast.sendJitReminder(sohibul, this.animalLabel(nextAnimal));
+            console.error('[ops jit]', JSON.stringify({ nextAnimalCode: nextAnimal.animalCode, ...result }));
+          }
+        } catch (e: any) {
+          console.error('[ops jit err]', e.stack || e.message);
         }
-      } catch (e: any) {
-        console.error('[ops start jit prep]', e.stack || e.message);
-      }
+      })();
     }
     return { animal, jitTriggered: !!nextWaitingId };
   }
