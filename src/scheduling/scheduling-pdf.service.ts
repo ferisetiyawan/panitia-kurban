@@ -43,6 +43,7 @@ export class SchedulingPdfService {
             permintaanKhusus: s.permintaanKhusus,
             catatanSebagian: s.catatanSebagian,
             catatanPanitia: s.catatanPanitia,
+            maranos: s.maranos ?? '',
             name: it.sohibulRequests.length > 1 ? s.name : undefined,
           }));
           const summary = summarizePermintaan(permItems);

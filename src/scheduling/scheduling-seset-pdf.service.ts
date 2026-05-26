@@ -61,6 +61,7 @@ export class SchedulingSesetPdfService {
           doc.text(`  Permintaan khusus: ${s.permintaanKhusus || '—'}`);
           doc.text(`  Catatan pengambilan: ${s.catatanSebagian || '—'}`);
           doc.text(`  Catatan untuk panitia: ${s.catatanPanitia || '—'}`);
+          doc.text(`  Hadiah daging Maranos: ${s.maranos || '—'}`);
           doc.moveDown(0.2);
         }
 
