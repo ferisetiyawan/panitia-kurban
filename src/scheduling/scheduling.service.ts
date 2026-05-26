@@ -225,9 +225,12 @@ export class SchedulingService {
   ): Promise<PreferensiTime | null> {
     if (!formKey) return null;
     const fr = await this.formRepo.findOne({ where: { pengkurbanId, formKey } });
-    if (!fr) return null;
-    const value = fr.data?.['Preferensi waktu penyembelihan'];
-    return parsePreferensiTime(value);
+    if (!fr || !fr.data) return null;
+    // Prefix-match in case form admin renames or adds newlines to the column header
+    const entry = Object.entries(fr.data).find(([k]) =>
+      k.startsWith('Preferensi waktu penyembelihan'),
+    );
+    return parsePreferensiTime(entry ? entry[1] : null);
   }
 
   /**

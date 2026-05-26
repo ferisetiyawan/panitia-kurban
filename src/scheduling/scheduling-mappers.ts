@@ -3,6 +3,13 @@ export interface PreferensiTime {
   minute: number;
 }
 
+function findByPrefix(data: Record<string, string>, prefix: string): string {
+  for (const [k, v] of Object.entries(data)) {
+    if (k.startsWith(prefix)) return v ?? '';
+  }
+  return '';
+}
+
 export function parsePreferensiTime(
   value: string | null | undefined,
 ): PreferensiTime | null {
@@ -153,12 +160,10 @@ export function extractPermintaan(
 ): Permintaan {
   const d = data ?? {};
   return {
-    hak: (d['Hak daging qurban untuk Sohibul Qurban'] ?? '').trim(),
-    permintaanKhusus: (
-      d['Permintaan khusus untuk bagian tertentu untuk Sohibul Qurban'] ?? ''
-    ).trim(),
-    catatanSebagian: (d['Catatan pengambilan hak sebagian'] ?? '').trim(),
-    catatanPanitia: (d['Catatan Khusus untuk Panitia'] ?? '').trim(),
+    hak: findByPrefix(d, 'Hak daging qurban').trim(),
+    permintaanKhusus: findByPrefix(d, 'Permintaan khusus').trim(),
+    catatanSebagian: findByPrefix(d, 'Catatan pengambilan').trim(),
+    catatanPanitia: findByPrefix(d, 'Catatan Khusus untuk Panitia').trim(),
   };
 }
 
