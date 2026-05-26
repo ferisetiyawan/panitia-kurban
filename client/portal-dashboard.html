@@ -111,6 +111,15 @@
       </div>
     </div>
 
+    <!-- Jadwal Penyembelihan Card -->
+    <div class="card mb-4" id="card-jadwal">
+      <div style="font-size:14px; font-weight:700; color:#f0fdf4; margin-bottom:4px;">📅 Jadwal Penyembelihan Anda</div>
+      <div style="font-size:12px; color:#9ca3af; margin-bottom:16px;">Jam dan tim untuk setiap hewan qurban Anda</div>
+      <div id="jadwal-content">
+        <div style="color:#9ca3af; font-size:13px;">Memuat...</div>
+      </div>
+    </div>
+
     <!-- Form Response Card -->
     <div class="card mb-4">
       <div style="font-size:14px; font-weight:700; color:#f0fdf4; margin-bottom:4px;">📋 Konfirmasi Teknis</div>
@@ -407,13 +416,55 @@
       document.getElementById('reg-switcher-wrap').style.display = 'block';
     }
 
+    function renderJadwal(jadwal) {
+      const el = document.getElementById('jadwal-content');
+      if (!Array.isArray(jadwal) || jadwal.length === 0) {
+        el.innerHTML = '<div style="color:#9ca3af; font-size:13px;">Jadwal belum di-generate panitia. Mohon ditunggu — pengumuman akan disampaikan via grup sohibul.</div>';
+        return;
+      }
+      const fmtTime = (iso) => {
+        if (!iso) return '—';
+        const d = new Date(iso);
+        return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+      };
+      const fmtDate = (iso) => {
+        if (!iso) return '';
+        const d = new Date(iso);
+        const months = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+        return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+      };
+      const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+      const teamLabel = (t) => t === 'SAPI' ? 'Tim Sapi' : 'Tim Kambing/Domba';
+
+      el.innerHTML = jadwal.map((a) => {
+        if (!a.scheduledAt) {
+          return `<div style="padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.06);">
+        <div style="font-family:monospace; font-size:12px; color:#9ca3af;">${esc(a.animalCode)}</div>
+        <div style="font-size:13px; color:#fcd34d; margin-top:4px;">Jadwal belum tersedia</div>
+      </div>`;
+        }
+        return `<div style="padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.06);">
+      <div style="font-family:monospace; font-size:12px; color:#9ca3af;">${esc(a.animalCode)} • ${esc(a.animalType)}</div>
+      <div style="display:flex; gap:16px; align-items:baseline; margin-top:6px;">
+        <div style="font-size:20px; font-weight:800; color:#10b981; font-family:monospace;">${fmtTime(a.scheduledAt)}</div>
+        <div style="font-size:13px; color:#f0fdf4;">${teamLabel(a.scheduledTeam)}</div>
+      </div>
+      <div style="font-size:11px; color:#9ca3af; margin-top:4px;">${fmtDate(a.scheduledAt)}</div>
+    </div>`;
+      }).join('') +
+      `<div style="margin-top:14px; padding:10px; background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.2); border-radius:6px; font-size:12px; color:#6ee7b7;">
+    ⏰ Mohon hadir minimal 15 menit sebelum slot Anda. Update via grup sohibul atau portal ini.
+  </div>`;
+    }
+
     async function init() {
       try {
-        const [profile, formResponses, animals, registrations] = await Promise.all([
+        const [profile, formResponses, animals, registrations, jadwal] = await Promise.all([
           portalApi('/me'),
           portalApi('/form-response'),
           portalApi('/animals'),
           portalApi('/registrations').catch(() => []),
+          portalApi('/scheduling/me').catch(() => []),
         ]);
         currentShohibulName = profile.shohibulName || profile.name;
         if (profile.impersonatedBy) {
@@ -422,6 +473,7 @@
         renderProfile(profile);
         renderFormResponse(formResponses);
         renderAnimals(animals, profile.animalType);
+        renderJadwal(jadwal);
         renderRegSwitcher(registrations, profile.id);
       } catch (e) {
         if (e.message !== 'Session expired') {
