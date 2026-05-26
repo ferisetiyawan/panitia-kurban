@@ -6,6 +6,7 @@ import { Pengkurban } from '../pengkurban/pengkurban.entity';
 import { FormResponse } from '../form-responses/form-response.entity';
 import { Event } from '../events/event.entity';
 import { assignSlots, parsePreferensiTime, PreferensiTime } from './scheduling-mappers';
+import { extractPermintaan, Permintaan } from './scheduling-mappers';
 
 export type Team = 'SAPI' | 'KAMBING_DOMBA';
 
@@ -83,6 +84,40 @@ export class SchedulingService {
         animal,
         pengkurban: await this.sohibulOf(animal),
       })),
+    );
+  }
+
+  /**
+   * Cheat sheet untuk tim jagal/seset: animals yang udah dijadwalkan, dengan
+   * permintaan tiap sohibul. Individual = 1 sohibul; kolektif = many.
+   */
+  async getSesetData(
+    eventId: string,
+    team?: Team,
+  ): Promise<Array<{
+    animal: Animal;
+    sohibulRequests: Array<{ name: string; phone: string | null } & Permintaan>;
+  }>> {
+    const formKey = process.env.KONFIRMASI_TEKNIS_FORM_KEY;
+    const items = await this.getSchedule(eventId, team);
+
+    return Promise.all(
+      items.map(async ({ animal, pengkurban }) => {
+        const sohibulRequests = await Promise.all(
+          pengkurban.map(async (pk) => {
+            const fr = formKey
+              ? await this.formRepo.findOne({ where: { pengkurbanId: pk.id, formKey } })
+              : null;
+            const perm = extractPermintaan(fr?.data ?? null);
+            return {
+              name: pk.name,
+              phone: pk.phone ?? null,
+              ...perm,
+            };
+          }),
+        );
+        return { animal, sohibulRequests };
+      }),
     );
   }
 

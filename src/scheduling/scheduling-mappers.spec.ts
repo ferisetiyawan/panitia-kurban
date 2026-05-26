@@ -2,6 +2,9 @@ import {
   parsePreferensiTime,
   assignSlots,
   PreferensiTime,
+  extractPermintaan,
+  summarizePermintaan,
+  Permintaan,
 } from './scheduling-mappers';
 
 describe('parsePreferensiTime', () => {
@@ -119,5 +122,77 @@ describe('assignSlots', () => {
     // F (FLEX) fills second-earliest empty slot 07:45
     expect(byId('F').slotStart.getHours()).toBe(7);
     expect(byId('F').slotStart.getMinutes()).toBe(45);
+  });
+});
+
+describe('extractPermintaan', () => {
+  it('extracts all 4 fields from full form data', () => {
+    const data = {
+      'Hak daging qurban untuk Sohibul Qurban': 'Ambil Hak Paha Kanan untuk hewan qurban perorangan',
+      'Permintaan khusus untuk bagian tertentu untuk Sohibul Qurban': 'Kaki, Ekor',
+      'Catatan pengambilan hak sebagian': 'Paha kanan 4kg',
+      'Catatan Khusus untuk Panitia': 'Tolong bagian has dalam',
+    };
+    expect(extractPermintaan(data)).toEqual({
+      hak: 'Ambil Hak Paha Kanan untuk hewan qurban perorangan',
+      permintaanKhusus: 'Kaki, Ekor',
+      catatanSebagian: 'Paha kanan 4kg',
+      catatanPanitia: 'Tolong bagian has dalam',
+    });
+  });
+
+  it('returns empty strings for missing fields', () => {
+    expect(extractPermintaan({})).toEqual({
+      hak: '',
+      permintaanKhusus: '',
+      catatanSebagian: '',
+      catatanPanitia: '',
+    });
+  });
+
+  it('handles null/undefined data', () => {
+    expect(extractPermintaan(null as any)).toEqual({
+      hak: '',
+      permintaanKhusus: '',
+      catatanSebagian: '',
+      catatanPanitia: '',
+    });
+  });
+
+  it('trims whitespace', () => {
+    const data = { 'Hak daging qurban untuk Sohibul Qurban': '   Paha kanan   ' };
+    expect(extractPermintaan(data).hak).toBe('Paha kanan');
+  });
+});
+
+describe('summarizePermintaan', () => {
+  const empty: Permintaan = { hak: '', permintaanKhusus: '', catatanSebagian: '', catatanPanitia: '' };
+
+  it('returns dash for all-empty', () => {
+    expect(summarizePermintaan([empty])).toBe('—');
+  });
+
+  it('joins permintaan khusus + catatan sebagian for single sohibul', () => {
+    const p: Permintaan = { ...empty, permintaanKhusus: 'Kaki', catatanSebagian: 'Paha kanan 4kg' };
+    const out = summarizePermintaan([p]);
+    expect(out).toContain('Kaki');
+    expect(out).toContain('Paha kanan');
+  });
+
+  it('truncates long output to ~40 char (+ ellipsis)', () => {
+    const long: Permintaan = {
+      ...empty,
+      permintaanKhusus: 'Kaki, ekor, lidah, has dalam, paha, iga, sandung lamur, kepala, jantung',
+    };
+    const out = summarizePermintaan([long]);
+    expect(out.length).toBeLessThanOrEqual(43);
+  });
+
+  it('prefixes nama for kolektif (multiple sohibul)', () => {
+    const a: Permintaan = { ...empty, name: 'Asep', permintaanKhusus: 'Kaki' };
+    const b: Permintaan = { ...empty, name: 'Margono', permintaanKhusus: 'Has dalam' };
+    const out = summarizePermintaan([a, b]);
+    expect(out).toMatch(/Asep/);
+    expect(out).toMatch(/Margono/);
   });
 });

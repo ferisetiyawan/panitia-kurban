@@ -139,3 +139,41 @@ export function assignSlots<T = unknown>(
       return result;
     });
 }
+
+export interface Permintaan {
+  hak: string;
+  permintaanKhusus: string;
+  catatanSebagian: string;
+  catatanPanitia: string;
+  name?: string;
+}
+
+export function extractPermintaan(
+  data: Record<string, string> | null | undefined,
+): Permintaan {
+  const d = data ?? {};
+  return {
+    hak: (d['Hak daging qurban untuk Sohibul Qurban'] ?? '').trim(),
+    permintaanKhusus: (
+      d['Permintaan khusus untuk bagian tertentu untuk Sohibul Qurban'] ?? ''
+    ).trim(),
+    catatanSebagian: (d['Catatan pengambilan hak sebagian'] ?? '').trim(),
+    catatanPanitia: (d['Catatan Khusus untuk Panitia'] ?? '').trim(),
+  };
+}
+
+export function summarizePermintaan(items: Permintaan[]): string {
+  const MAX_LEN = 40;
+  const parts: string[] = [];
+  for (const p of items) {
+    const interesting = [p.permintaanKhusus, p.catatanSebagian]
+      .filter((s) => s && s.length > 0)
+      .join(' / ');
+    if (!interesting) continue;
+    parts.push(p.name ? `${p.name}:${interesting}` : interesting);
+  }
+  if (parts.length === 0) return '—';
+  const joined = parts.join(' • ');
+  if (joined.length <= MAX_LEN) return joined;
+  return joined.slice(0, MAX_LEN) + '...';
+}

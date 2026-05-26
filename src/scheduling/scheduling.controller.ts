@@ -38,6 +38,13 @@ export class SchedulingController {
     return this.service.getSchedule(eventId, team);
   }
 
+  @Get('seset')
+  @Roles(Role.SUPER_ADMIN, Role.KETUA_PANITIA, Role.PANITIA_VOUCHER, Role.PANITIA_SCANNER)
+  async sesetData(@Query('eventId') eventId: string, @Query('team') team?: Team) {
+    if (!eventId) throw new BadRequestException('eventId required');
+    return this.service.getSesetData(eventId, team);
+  }
+
   @Post('generate')
   @Roles(Role.SUPER_ADMIN, Role.KETUA_PANITIA)
   async generate(@Body() body: { eventId: string }) {
