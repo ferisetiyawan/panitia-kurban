@@ -74,6 +74,94 @@ export class SchedulingBroadcastService {
     return null;
   }
 
+  /**
+   * JIT reminder: WA ke sohibul next-up bahwa hewan mereka segera dipotong.
+   * Called when current animal transitions to IN_PROGRESS.
+   */
+  async sendJitReminder(
+    nextAnimalSohibul: Array<{ name: string; phone: string }>,
+    nextAnimalLabel: string,
+  ): Promise<{ sent: number; failed: string[] }> {
+    if (nextAnimalSohibul.length === 0) return { sent: 0, failed: [] };
+    const url = process.env.WA_BOT_URL;
+    const key = process.env.WA_BOT_API_KEY;
+    if (!url || !key) {
+      this.logger.warn('wa-bot not configured; skipping JIT reminder');
+      return { sent: 0, failed: ['env_missing'] };
+    }
+    const failed: string[] = [];
+    let sent = 0;
+    for (const s of nextAnimalSohibul) {
+      const message =
+        `Assalamualaikum ${s.name},\n\n` +
+        `Hewan qurban Anda (${nextAnimalLabel}) sebentar lagi akan disembelih (next-up). ` +
+        `Mohon hadir di area penyembelihan Masjid Al Hijrah CGE sekarang.\n\n` +
+        `Jazakumullahu khairan,\nPanitia Kurban`;
+      try {
+        const res = await fetch(`${url}/send`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-api-key': key },
+          body: JSON.stringify({ to: s.phone, message }),
+        });
+        if (!res.ok) {
+          const txt = await res.text();
+          failed.push(`${s.phone}: ${res.status} ${txt}`);
+        } else {
+          sent++;
+        }
+      } catch (e) {
+        failed.push(`${s.phone}: ${(e as Error).message}`);
+      }
+    }
+    return { sent, failed };
+  }
+
+  /**
+   * Auto-broadcast foto: WA ke sohibul tidak-hadir bahwa hewan mereka udah dipotong + link foto.
+   */
+  async sendFotoBroadcast(
+    tidakHadirSohibul: Array<{ name: string; phone: string }>,
+    animalLabel: string,
+    photoUrls: string[],
+  ): Promise<{ sent: number; failed: string[] }> {
+    if (tidakHadirSohibul.length === 0) return { sent: 0, failed: [] };
+    const url = process.env.WA_BOT_URL;
+    const key = process.env.WA_BOT_API_KEY;
+    if (!url || !key) {
+      this.logger.warn('wa-bot not configured; skipping foto broadcast');
+      return { sent: 0, failed: ['env_missing'] };
+    }
+    const failed: string[] = [];
+    let sent = 0;
+    const fotoLinks = photoUrls.length
+      ? photoUrls.map((u) => `• ${u}`).join('\n')
+      : '(belum ada foto, akan menyusul)';
+    const message = (name: string) =>
+      `Assalamualaikum ${name},\n\n` +
+      `Hewan qurban Anda (${animalLabel}) telah selesai disembelih. Berikut foto/video:\n\n` +
+      `${fotoLinks}\n\n` +
+      `Jazakumullahu khairan,\nPanitia Kurban Masjid Al Hijrah CGE`;
+    for (const s of tidakHadirSohibul) {
+      try {
+        const res = await fetch(`${url}/send`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-api-key': key },
+          body: JSON.stringify({ to: s.phone, message: message(s.name) }),
+        });
+        if (!res.ok) {
+          const txt = await res.text();
+          failed.push(`${s.phone}: ${res.status} ${txt}`);
+        } else {
+          sent++;
+        }
+        await new Promise((r) => setTimeout(r, 1000));
+      } catch (e) {
+        failed.push(`${s.phone}: ${(e as Error).message}`);
+      }
+    }
+    return { sent, failed };
+  }
+
   async sendToGroup(groupJid: string, message: string): Promise<void> {
     const url = process.env.WA_BOT_URL;
     const key = process.env.WA_BOT_API_KEY;
