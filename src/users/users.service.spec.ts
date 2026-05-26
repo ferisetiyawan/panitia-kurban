@@ -41,24 +41,44 @@ describe('UsersService', () => {
   });
 
   it('should find user by username', async () => {
-    mockUsersRepository.findOne.mockResolvedValue({ id: '1', username: 'testuser' });
+    mockUsersRepository.findOne.mockResolvedValue({
+      id: '1',
+      username: 'testuser',
+    });
     const user = await service.findByUsername('testuser');
     expect(user).toEqual({ id: '1', username: 'testuser' });
-    expect(mockUsersRepository.findOne).toHaveBeenCalledWith({ where: { username: 'testuser' } });
+    expect(mockUsersRepository.findOne).toHaveBeenCalledWith({
+      where: { username: 'testuser' },
+    });
   });
 
   it('should hash password and strip it from result when creating', async () => {
     (bcrypt.hash as jest.Mock).mockResolvedValue('hashedpassword');
     mockUsersRepository.findOne.mockResolvedValue(null);
-    mockUsersRepository.create.mockReturnValue({ username: 'test', fullName: 'john doe', password: 'hashedpassword' });
-    mockUsersRepository.save.mockResolvedValue({ id: '1', username: 'test', fullName: 'john doe', password: 'hashedpassword' });
-
-    const result = await service.create({ username: 'test', fullName: 'john doe', password: '123' } as any);
-    
-    expect(mockUsersRepository.create).toHaveBeenCalledWith(expect.objectContaining({
+    mockUsersRepository.create.mockReturnValue({
+      username: 'test',
       fullName: 'john doe',
       password: 'hashedpassword',
-    }));
+    });
+    mockUsersRepository.save.mockResolvedValue({
+      id: '1',
+      username: 'test',
+      fullName: 'john doe',
+      password: 'hashedpassword',
+    });
+
+    const result = await service.create({
+      username: 'test',
+      fullName: 'john doe',
+      password: '123',
+    } as any);
+
+    expect(mockUsersRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fullName: 'john doe',
+        password: 'hashedpassword',
+      }),
+    );
     expect(result.password).toBeUndefined();
   });
 });

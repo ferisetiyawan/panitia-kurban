@@ -1,4 +1,11 @@
-import { IsString, IsEnum, IsOptional, IsNumber, Matches } from 'class-validator';
+import {
+  IsString,
+  IsEnum,
+  IsOptional,
+  IsNumber,
+  Matches,
+  ValidateIf,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { AnimalType } from '../../common/enums/animal-type.enum';
 import { PurchaseType } from '../../common/enums/purchase-type.enum';
@@ -36,7 +43,8 @@ export class CreatePengkurbanDto {
   @IsOptional()
   @IsString()
   @Matches(/^(08[0-9]{8,11}|\+[1-9][0-9]{9,14})$/, {
-    message: 'Nomor HP tidak valid. Gunakan format 08... (10-13 digit) atau +<kode negara>...',
+    message:
+      'Nomor HP tidak valid. Gunakan format 08... (10-13 digit) atau +<kode negara>...',
   })
   phone?: string;
 
@@ -47,6 +55,14 @@ export class CreatePengkurbanDto {
   @IsOptional()
   @IsEnum(RegistrationStatus)
   status?: RegistrationStatus;
+
+  // Override default infaq_amount. null = waiver (skip dari rekap).
+  // Undefined = pakai default getInfaqAmount(animalType).
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsNumber()
+  @Type(() => Number)
+  infaqAmount?: number | null;
 }
 
 export class UpdatePengkurbanDto {
@@ -82,7 +98,8 @@ export class UpdatePengkurbanDto {
   @IsOptional()
   @IsString()
   @Matches(/^(08[0-9]{8,11}|\+[1-9][0-9]{9,14})$/, {
-    message: 'Nomor HP tidak valid. Gunakan format 08... (10-13 digit) atau +<kode negara>...',
+    message:
+      'Nomor HP tidak valid. Gunakan format 08... (10-13 digit) atau +<kode negara>...',
   })
   phone?: string;
 
@@ -93,4 +110,10 @@ export class UpdatePengkurbanDto {
   @IsOptional()
   @IsEnum(RegistrationStatus)
   status?: RegistrationStatus;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsNumber()
+  @Type(() => Number)
+  infaqAmount?: number | null;
 }

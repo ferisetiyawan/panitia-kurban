@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { join } from 'path';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { EventsModule } from './events/events.module';
@@ -16,6 +17,10 @@ import { DonationsModule } from './donations/donations.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { NotificationsModule } from './common/notifications/notifications.module';
 import { RekapModule } from './rekap/rekap.module';
+import { FormResponsesModule } from './form-responses/form-responses.module';
+import { AnimalsModule } from './animals/animals.module';
+import { PortalModule } from './portal/portal.module';
+import { SchedulingModule } from './scheduling/scheduling.module';
 
 import { AppController } from './app.controller';
 
@@ -42,7 +47,7 @@ const isProduction = process.env.NODE_ENV === 'production';
         ? process.env.DB_NAME || 'panitia_kurban'
         : undefined,
       autoLoadEntities: true,
-      synchronize: true, // Auto-create tables in dev
+      synchronize: process.env.DB_SYNCHRONIZE !== 'false', // Set DB_SYNCHRONIZE=false to skip schema sync
       ssl: isProduction,
       extra: isProduction
         ? {
@@ -68,6 +73,11 @@ const isProduction = process.env.NODE_ENV === 'production';
     AnalyticsModule,
     NotificationsModule,
     RekapModule,
+    ScheduleModule.forRoot(),
+    FormResponsesModule,
+    SchedulingModule,
+    AnimalsModule,
+    PortalModule,
   ],
   controllers: [AppController],
   providers: [

@@ -35,6 +35,7 @@ regexes = [
   '''<secret[^>]*>''',
   '''\$\{[A-Z_]+\}''',
   '''process\.env\.[A-Z_]+''',
+  '''konfirmasi_teknis_[a-z0-9_]+''',
 ]
 paths = [
   '''(.+/)?node_modules/''',

@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  BadRequestException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { UsersService } from '../users/users.service';
@@ -42,18 +46,30 @@ export class AuthService {
   async forgotPassword(username: string) {
     const user = await this.usersService.findByUsername(username);
     if (!user || !user.isActive) {
-      return { message: 'Jika username terdaftar, instruksi reset password telah dikirim.' };
+      return {
+        message:
+          'Jika username terdaftar, instruksi reset password telah dikirim.',
+      };
     }
     const token = require('crypto').randomBytes(32).toString('hex');
     const expires = new Date(Date.now() + 3600000); // 1 hour
     await this.usersService.updateResetToken(user.id, token, expires);
-    console.log(`\n\n[RESET PASSWORD LINK]: http://localhost:3000/reset-password.html?token=${token}\n\n`);
-    return { message: 'Instruksi reset password telah dibuat. Silakan cek console log (karena belum ada layanan email).' };
+    console.log(
+      `\n\n[RESET PASSWORD LINK]: http://localhost:3000/reset-password.html?token=${token}\n\n`,
+    );
+    return {
+      message:
+        'Instruksi reset password telah dibuat. Silakan cek console log (karena belum ada layanan email).',
+    };
   }
 
   async resetPassword(token: string, newPassword: string) {
     const user = await this.usersService.findByResetToken(token);
-    if (!user || !user.resetTokenExpires || user.resetTokenExpires < new Date()) {
+    if (
+      !user ||
+      !user.resetTokenExpires ||
+      user.resetTokenExpires < new Date()
+    ) {
       throw new BadRequestException('Token tidak valid atau sudah kedaluwarsa');
     }
     await this.usersService.update(user.id, { password: newPassword } as any);

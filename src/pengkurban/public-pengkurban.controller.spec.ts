@@ -16,10 +16,22 @@ describe('PublicPengkurbanController.getPricing', () => {
     expect(result.kambing.every((t) => t.infaq === 300_000)).toBe(true);
   });
 
-  it('returns infaq for sapi kolektif opsi A & B', () => {
+  it('returns infaq for sapi kolektif opsi A, B & C', () => {
     const result = controller.getPricing();
     expect(result.sapiKolektif.opsiA.infaq).toBe(300_000);
     expect(result.sapiKolektif.opsiB.infaq).toBe(300_000);
+    expect(result.sapiKolektif.opsiC.infaq).toBe(300_000);
+  });
+
+  it('exposes opsiC pricing identik dengan opsiB (grouping label saja)', () => {
+    const result = controller.getPricing();
+    expect(result.sapiKolektif.opsiC.perOrang).toBe(
+      result.sapiKolektif.opsiB.perOrang,
+    );
+    expect(result.sapiKolektif.opsiC.beratSapi).toBe(
+      result.sapiKolektif.opsiB.beratSapi,
+    );
+    expect(result.sapiKolektif.opsiC.label).toBe('Sapi C');
   });
 
   it('returns infaq for sapi perorangan', () => {

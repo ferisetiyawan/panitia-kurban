@@ -1,4 +1,9 @@
-import { Injectable, NestInterceptor, ExecutionContext, CallHandler } from '@nestjs/common';
+import {
+  Injectable,
+  NestInterceptor,
+  ExecutionContext,
+  CallHandler,
+} from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { ActivityLogsService } from './activity-logs.service';
@@ -15,7 +20,7 @@ export class ActivityLogInterceptor implements NestInterceptor {
       tap(() => {
         if (['POST', 'PATCH', 'PUT', 'DELETE'].includes(method)) {
           if (url.includes('/api/auth/login')) return;
-          
+
           let details = undefined;
           if (body && Object.keys(body).length > 0) {
             const safeBody = { ...body };
@@ -26,7 +31,7 @@ export class ActivityLogInterceptor implements NestInterceptor {
           this.activityLogsService.logAction({
             userId: user?.id,
             action: `${method} ${url}`,
-            details
+            details,
           });
         }
       }),

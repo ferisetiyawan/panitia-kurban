@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portal Sohibul - Masjid Al Hijrah CGE</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="bg-orb bg-orb-1"></div>
+  <div class="bg-orb bg-orb-2"></div>
+
+  <div style="max-width: 640px; margin: 0 auto; padding: 16px;">
+
+    <!-- Impersonation banner -->
+    <div id="impersonate-banner" style="display:none; background:rgba(245,158,11,0.18); border:1px solid rgba(245,158,11,0.4); border-radius:8px; padding:10px 14px; margin-top:16px; color:#fcd34d; font-size:13px; text-align:center;">
+      🔎 <strong>Mode Admin Impersonate</strong> — Anda melihat halaman ini sebagai sohibul. Edit akan benar-benar mengubah data.
+    </div>
+
+    <!-- Top bar -->
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:16px 0 24px;">
+      <div>
+        <div style="font-size:20px; font-weight:800; color:#f0fdf4;" id="greeting">🕌 Portal Sohibul</div>
+        <div style="font-size:12px; color:#9ca3af;">Masjid Al Hijrah CGE</div>
+      </div>
+      <button onclick="doLogout()" style="background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); color:#fca5a5; border-radius:8px; padding:8px 14px; font-size:13px; cursor:pointer;">
+        Keluar
+      </button>
+    </div>
+
+    <!-- Registration switcher / counter -->
+    <div id="reg-switcher-wrap" style="display:none; margin-bottom:16px;">
+      <label style="font-size:11px; color:#9ca3af; display:block; margin-bottom:4px;" id="reg-switcher-label">Pilih pendaftaran:</label>
+      <select id="reg-switcher" onchange="switchRegistration(this.value)" class="input-field" style="background:rgba(255,255,255,0.07);">
+      </select>
+    </div>
+
+    <!-- Status Card -->
+    <div class="card mb-4" id="card-status" style="display:none;">
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+        <div>
+          <div style="font-size:11px; font-weight:700; color:#9ca3af; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">Nomor Registrasi</div>
+          <div style="font-family:monospace; font-size:18px; font-weight:800; color:#10b981;" id="reg-number">-</div>
+        </div>
+        <div id="status-badge"></div>
+      </div>
+
+      <div style="border-top:1px solid rgba(255,255,255,0.08); margin:16px 0;"></div>
+
+      <!-- Sohibul name (full-width, multi-line, editable) -->
+      <div style="margin-bottom:16px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+          <div style="font-size:11px; color:#9ca3af;">Nama Sohibul (yang dicantumkan saat penyembelihan)</div>
+          <button onclick="openEditSohibul()" id="btn-edit-sohibul" style="background:none; border:1px solid rgba(110,231,183,0.3); color:#6ee7b7; border-radius:6px; padding:3px 10px; font-size:11px; cursor:pointer;">
+            ✏️ Edit
+          </button>
+        </div>
+        <div style="font-size:13px; font-weight:600; color:#f0fdf4; white-space:pre-wrap;" id="sohibul-name">-</div>
+
+        <!-- Edit form (hidden by default) -->
+        <div id="sohibul-edit-form" style="display:none; margin-top:10px;">
+          <textarea id="sohibul-edit-input" class="input-field" rows="6" style="width:100%; resize:vertical; font-family:inherit;" placeholder="Tulis satu nama per baris..."></textarea>
+          <div style="font-size:11px; color:#9ca3af; margin-top:6px;">Tip: tulis 1 nama per baris untuk daftar sohibul keluarga.</div>
+          <div id="sohibul-edit-error" style="display:none; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); border-radius:6px; padding:8px 12px; color:#fca5a5; font-size:12px; margin-top:8px;"></div>
+          <div style="display:flex; gap:8px; margin-top:10px;">
+            <button onclick="saveSohibulName()" id="btn-save-sohibul" class="btn-primary" style="flex:1; padding:8px;">💾 Simpan</button>
+            <button onclick="cancelEditSohibul()" style="flex:1; padding:8px; background:rgba(107,114,128,0.15); border:1px solid rgba(107,114,128,0.3); color:#9ca3af; border-radius:8px; cursor:pointer;">Batal</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <div style="font-size:11px; color:#9ca3af; margin-bottom:2px;">Nama Pendaftar</div>
+          <div style="font-size:13px; color:#9ca3af;" id="pendaftar-name">-</div>
+        </div>
+        <div>
+          <div style="font-size:11px; color:#9ca3af; margin-bottom:2px;">Jenis Hewan</div>
+          <div style="font-size:14px; font-weight:600; color:#f0fdf4;" id="animal-type">-</div>
+        </div>
+        <div>
+          <div style="font-size:11px; color:#9ca3af; margin-bottom:2px;">Event Kurban</div>
+          <div style="font-size:13px; color:#9ca3af;" id="event-name">-</div>
+        </div>
+        <div>
+          <div style="font-size:11px; color:#9ca3af; margin-bottom:2px;">Jenis Pembelian</div>
+          <div style="font-size:13px; color:#9ca3af;" id="purchase-type">-</div>
+        </div>
+      </div>
+
+      <!-- PENDING_PAYMENT notice -->
+      <div id="pending-notice" style="display:none; margin-top:16px; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); border-radius:8px; padding:12px;">
+        <div style="font-size:13px; color:#fef3c7; font-weight:600; margin-bottom:4px;">⚠️ Menunggu Pembayaran</div>
+        <div style="font-size:12px; color:#fcd34d;">Silakan upload bukti transfer di halaman <a href="/status.html" style="color:#10b981; text-decoration:underline;">Cek Status</a>.</div>
+      </div>
+
+      <!-- REJECTED notice -->
+      <div id="rejected-notice" style="display:none; margin-top:16px; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); border-radius:8px; padding:12px;">
+        <div style="font-size:13px; color:#fca5a5; font-weight:600; margin-bottom:4px;">❌ Pendaftaran Ditolak</div>
+        <div style="font-size:12px; color:#fca5a5;">Hubungi panitia untuk informasi lebih lanjut.</div>
+      </div>
+    </div>
+
+    <!-- Hewan Saya Card -->
+    <div class="card mb-4" id="card-animals" style="display:none;">
+      <div style="font-size:14px; font-weight:700; color:#f0fdf4; margin-bottom:4px;">🐄 Hewan Qurban Saya</div>
+      <div style="font-size:12px; color:#9ca3af; margin-bottom:16px;" id="animals-subtitle">Hewan yang teralokasikan untuk pendaftaran Anda</div>
+      <div id="animals-content">
+        <div style="color:#9ca3af; font-size:13px;">Memuat...</div>
+      </div>
+    </div>
+
+    <!-- Jadwal Penyembelihan Card -->
+    <div class="card mb-4" id="card-jadwal">
+      <div style="font-size:14px; font-weight:700; color:#f0fdf4; margin-bottom:4px;">📅 Jadwal Penyembelihan Anda</div>
+      <div style="font-size:12px; color:#9ca3af; margin-bottom:16px;">Jam dan tim untuk setiap hewan qurban Anda</div>
+      <div id="jadwal-content">
+        <div style="color:#9ca3af; font-size:13px;">Memuat...</div>
+      </div>
+    </div>
+
+    <!-- Form Response Card -->
+    <div class="card mb-4">
+      <div style="font-size:14px; font-weight:700; color:#f0fdf4; margin-bottom:4px;">📋 Konfirmasi Teknis</div>
+      <div style="font-size:12px; color:#9ca3af; margin-bottom:16px;">Data dari formulir konfirmasi penyembelihan</div>
+      <div id="form-response-content">
+        <div style="color:#9ca3af; font-size:13px;">Memuat...</div>
+      </div>
+    </div>
+
+    <!-- Download Report -->
+    <div class="card mb-4">
+      <div style="font-size:14px; font-weight:700; color:#f0fdf4; margin-bottom:4px;">📄 Laporan PDF</div>
+      <div style="font-size:12px; color:#9ca3af; margin-bottom:16px;">Download ringkasan data pendaftaran dan konfirmasi teknis Anda</div>
+      <button onclick="downloadReport()" class="btn-primary" style="width:100%;" id="btn-pdf">
+        ⬇️ Download Laporan PDF
+      </button>
+    </div>
+
+    <!-- Footer -->
+    <div style="text-align:center; padding:16px 0; color:#374151; font-size:11px;">
+      Portal Sohibul Qurban — Idul Adha 1447 H
+    </div>
+  </div>
+
+  <script>
+    const portalToken = localStorage.getItem('portalToken');
+    if (!portalToken) {
+      window.location.href = '/portal.html';
+    }
+
+    function doLogout() {
+      localStorage.removeItem('portalToken');
+      localStorage.removeItem('portalUser');
+      window.location.href = '/portal.html';
+    }
+
+    async function portalApi(path, options = {}) {
+      const res = await fetch('/api/portal' + path, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${portalToken}`,
+          ...(options.headers || {}),
+        },
+      });
+      if (res.status === 401) {
+        doLogout();
+        throw new Error('Session expired');
+      }
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Request failed');
+      }
+      return res.json();
+    }
+
+    const STATUS_LABELS = {
+      PENDING_PAYMENT: 'Menunggu Pembayaran',
+      PENDING_VERIFICATION: 'Menunggu Verifikasi',
+      CONFIRMED: 'Terkonfirmasi',
+      REJECTED: 'Ditolak',
+    };
+    const STATUS_COLORS = {
+      PENDING_PAYMENT: { bg: 'rgba(245,158,11,0.15)', border: 'rgba(245,158,11,0.4)', text: '#fcd34d' },
+      PENDING_VERIFICATION: { bg: 'rgba(99,102,241,0.15)', border: 'rgba(99,102,241,0.4)', text: '#a5b4fc' },
+      CONFIRMED: { bg: 'rgba(16,185,129,0.15)', border: 'rgba(16,185,129,0.4)', text: '#6ee7b7' },
+      REJECTED: { bg: 'rgba(239,68,68,0.15)', border: 'rgba(239,68,68,0.4)', text: '#fca5a5' },
+    };
+    const ANIMAL_LABELS = {
+      DOMBA: 'Domba 🐑', KAMBING: 'Kambing 🐐', SAPI: 'Sapi 🐄',
+      SAPI_KOLEKTIF: 'Sapi Kolektif 🐄', SAPI_KOLEKTIF_A: 'Sapi Kolektif A 🐄',
+      SAPI_KOLEKTIF_B: 'Sapi Kolektif B 🐄', SAPI_KOLEKTIF_C: 'Sapi Kolektif C 🐄',
+      SAPI_PERORANGAN: 'Sapi Perorangan 🐄',
+    };
+    const PURCHASE_LABELS = { BELI_MASJID: 'Beli via Masjid', BAWA_SENDIRI: 'Bawa Sendiri' };
+
+    function formatSohibulNames(raw) {
+      const lines = (raw || '').split('\n').map(l => l.trim()).filter(Boolean);
+      if (lines.length <= 1) return lines[0] || '-';
+      return lines.map((n, i) => `${i + 1}. ${n}`).join('\n');
+    }
+
+    function renderProfile(profile) {
+      // Greeting
+      const name = profile.shohibulName || profile.name;
+      document.getElementById('greeting').textContent = `👋 ${name.split(/[\s\n]+/)[0]}`;
+
+      // Status card
+      document.getElementById('card-status').style.display = 'block';
+      document.getElementById('reg-number').textContent = profile.registrationNumber;
+      document.getElementById('sohibul-name').textContent = formatSohibulNames(profile.shohibulName || profile.name);
+      document.getElementById('pendaftar-name').textContent = profile.name;
+      document.getElementById('animal-type').textContent = ANIMAL_LABELS[profile.animalType] || profile.animalType;
+      document.getElementById('event-name').textContent = profile.event?.name || '-';
+      document.getElementById('purchase-type').textContent = PURCHASE_LABELS[profile.purchaseType] || profile.purchaseType;
+
+      // Status badge
+      const sc = STATUS_COLORS[profile.status] || { bg: 'rgba(107,114,128,0.15)', border: 'rgba(107,114,128,0.4)', text: '#9ca3af' };
+      document.getElementById('status-badge').innerHTML = `
+        <span style="background:${sc.bg}; border:1px solid ${sc.border}; color:${sc.text}; border-radius:20px; padding:5px 14px; font-size:12px; font-weight:700; white-space:nowrap;">
+          ${STATUS_LABELS[profile.status] || profile.status}
+        </span>`;
+
+      // Notices
+      if (profile.status === 'PENDING_PAYMENT') {
+        document.getElementById('pending-notice').style.display = 'block';
+      }
+      if (profile.status === 'REJECTED') {
+        document.getElementById('rejected-notice').style.display = 'block';
+      }
+    }
+
+    function renderFormResponse(responses) {
+      const el = document.getElementById('form-response-content');
+      if (!responses || responses.length === 0) {
+        el.innerHTML = `
+          <div style="background:rgba(107,114,128,0.1); border-radius:8px; padding:14px; text-align:center;">
+            <div style="font-size:24px; margin-bottom:8px;">📝</div>
+            <div style="color:#9ca3af; font-size:13px;">Belum ada data konfirmasi teknis.</div>
+            <div style="color:#9ca3af; font-size:12px; margin-top:4px;">Isi formulir konfirmasi yang dibagikan panitia.</div>
+          </div>`;
+        return;
+      }
+
+      el.innerHTML = responses.map(resp => {
+        const date = new Date(resp.submittedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+        const entries = Object.entries(resp.data || {});
+        const rows = entries.map(([k, v]) => `
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.04); gap:12px;">
+            <div style="font-size:12px; color:#9ca3af; flex-shrink:0; max-width:45%;">${k}</div>
+            <div style="font-size:12px; color:#f0fdf4; text-align:right;">${v || '-'}</div>
+          </div>`).join('');
+        return `
+          <div style="margin-bottom:16px;">
+            <div style="font-size:11px; color:#9ca3af; margin-bottom:8px;">Disubmit ${date}</div>
+            ${rows || '<div style="color:#9ca3af; font-size:12px;">Tidak ada data</div>'}
+          </div>`;
+      }).join('');
+    }
+
+    async function downloadReport() {
+      const btn = document.getElementById('btn-pdf');
+      btn.textContent = 'Memproses...';
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/portal/report/pdf', {
+          headers: { Authorization: `Bearer ${portalToken}` },
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          alert(err.message || 'Gagal download laporan');
+          return;
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'laporan-sohibul-qurban.pdf';
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        alert('Gagal download laporan: ' + e.message);
+      } finally {
+        btn.textContent = '⬇️ Download Laporan PDF';
+        btn.disabled = false;
+      }
+    }
+
+    const ANIMAL_STATUS_LABELS = {
+      PENDING: { text: '⏳ Belum Diterima', color: '#fcd34d', bg: 'rgba(245,158,11,0.12)' },
+      RECEIVED: { text: '✅ Diterima Panitia', color: '#6ee7b7', bg: 'rgba(16,185,129,0.12)' },
+    };
+
+    function escapeHtml(s) {
+      return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    function renderAnimals(animals, animalType) {
+      const isKolektif = /^SAPI_KOLEKTIF/.test(animalType || '');
+      const el = document.getElementById('animals-content');
+      const sub = document.getElementById('animals-subtitle');
+      document.getElementById('card-animals').style.display = 'block';
+
+      if (isKolektif) {
+        sub.textContent = `Daftar hewan ${ANIMAL_LABELS[animalType] || animalType} di event ini (share dengan sohibul lain)`;
+      } else {
+        sub.textContent = 'Hewan yang dialokasikan khusus untuk Anda';
+      }
+
+      if (!animals || animals.length === 0) {
+        el.innerHTML = `
+          <div style="background:rgba(107,114,128,0.1); border-radius:8px; padding:14px; text-align:center;">
+            <div style="font-size:24px; margin-bottom:8px;">🐄</div>
+            <div style="color:#9ca3af; font-size:13px;">Belum ada hewan teralokasikan.</div>
+            <div style="color:#9ca3af; font-size:12px; margin-top:4px;">Hewan akan muncul setelah panitia generate.</div>
+          </div>`;
+        return;
+      }
+
+      const SLAUGHTER_STATUS_LABELS = {
+        WAITING:     { text: '⏳ Menunggu giliran', color: '#fcd34d', bg: 'rgba(245,158,11,0.15)' },
+        IN_PROGRESS: { text: '🔥 Sedang dipotong', color: '#fca5a5', bg: 'rgba(239,68,68,0.2)' },
+        DONE:        { text: '✅ Sudah selesai',    color: '#6ee7b7', bg: 'rgba(16,185,129,0.18)' },
+        SKIPPED:     { text: '⏭️ Skipped',          color: '#9ca3af', bg: 'rgba(107,114,128,0.18)' },
+      };
+
+      el.innerHTML = animals.map(a => {
+        const st = ANIMAL_STATUS_LABELS[a.status] || { text: a.status, color: '#9ca3af', bg: 'rgba(107,114,128,0.12)' };
+        const slaughterSt = a.slaughterStatus ? SLAUGHTER_STATUS_LABELS[a.slaughterStatus] : null;
+        const received = a.receivedAt
+          ? new Date(a.receivedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+          : null;
+        const startedAt = a.slaughterStartedAt
+          ? new Date(a.slaughterStartedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+          : null;
+        const doneAt = a.slaughterDoneAt
+          ? new Date(a.slaughterDoneAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+          : null;
+        const photos = Array.isArray(a.photos) ? a.photos : [];
+        const photoHtml = photos.length > 0 ? `
+          <div style="display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;">
+            ${photos.map(fn => `
+              <a href="/api/uploads/animal-photos/${encodeURIComponent(fn)}" target="_blank" rel="noopener" style="display:block; width:84px; height:84px; border-radius:8px; overflow:hidden; border:1px solid rgba(255,255,255,0.1);">
+                <img src="/api/uploads/animal-photos/${encodeURIComponent(fn)}" alt="Foto hewan" style="width:100%; height:100%; object-fit:cover;" loading="lazy">
+              </a>`).join('')}
+          </div>` : '';
+        return `
+          <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:8px; padding:12px; margin-bottom:8px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+              <div style="font-family:monospace; font-size:13px; font-weight:700; color:#10b981;">${escapeHtml(a.animalCode)}</div>
+              <span style="background:${st.bg}; color:${st.color}; border-radius:20px; padding:3px 10px; font-size:11px; font-weight:600; white-space:nowrap;">${st.text}</span>
+            </div>
+            ${slaughterSt ? `<div style="margin-top:6px;"><span style="background:${slaughterSt.bg}; color:${slaughterSt.color}; border-radius:20px; padding:3px 10px; font-size:11px; font-weight:600;">${slaughterSt.text}</span>${startedAt ? ` <span style="font-size:11px; color:#9ca3af;">mulai ${startedAt}</span>` : ''}${doneAt ? ` <span style="font-size:11px; color:#9ca3af;">selesai ${doneAt}</span>` : ''}</div>` : ''}
+            ${received ? `<div style="font-size:11px; color:#9ca3af; margin-top:6px;">Diterima panitia: ${received}</div>` : ''}
+            ${photoHtml}
+          </div>`;
+      }).join('');
+    }
+
+    let currentShohibulName = '';
+    function openEditSohibul() {
+      document.getElementById('sohibul-edit-input').value = currentShohibulName;
+      document.getElementById('sohibul-edit-form').style.display = 'block';
+      document.getElementById('btn-edit-sohibul').style.display = 'none';
+      document.getElementById('sohibul-edit-input').focus();
+    }
+    function cancelEditSohibul() {
+      document.getElementById('sohibul-edit-form').style.display = 'none';
+      document.getElementById('btn-edit-sohibul').style.display = 'inline-block';
+      hideEditError();
+    }
+    function hideEditError() {
+      document.getElementById('sohibul-edit-error').style.display = 'none';
+    }
+    function showEditError(msg) {
+      const el = document.getElementById('sohibul-edit-error');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+
+    async function saveSohibulName() {
+      const newName = document.getElementById('sohibul-edit-input').value.trim();
+      if (!newName) {
+        showEditError('Nama sohibul tidak boleh kosong');
+        return;
+      }
+      const btn = document.getElementById('btn-save-sohibul');
+      btn.textContent = 'Menyimpan...';
+      btn.disabled = true;
+      hideEditError();
+      try {
+        const res = await portalApi('/me', {
+          method: 'PATCH',
+          body: JSON.stringify({ shohibulName: newName }),
+        });
+        currentShohibulName = res.shohibulName;
+        document.getElementById('sohibul-name').textContent = formatSohibulNames(res.shohibulName);
+        document.getElementById('greeting').textContent = `👋 ${res.shohibulName.split(/[\s\n]+/)[0]}`;
+        cancelEditSohibul();
+      } catch (e) {
+        showEditError(e.message);
+      } finally {
+        btn.textContent = '💾 Simpan';
+        btn.disabled = false;
+      }
+    }
+
+    async function switchRegistration(pengkurbanId) {
+      try {
+        const res = await portalApi('/auth/switch/' + pengkurbanId, { method: 'POST' });
+        localStorage.setItem('portalToken', res.token);
+        localStorage.setItem('portalUser', JSON.stringify(res.pengkurban));
+        window.location.reload();
+      } catch (e) {
+        console.error('[switchRegistration]', e);
+        alert('Gagal switch pendaftaran: ' + (e?.message || e) + '\n\nCoba refresh halaman (Cmd+Shift+R).');
+      }
+    }
+
+    function renderRegSwitcher(regs, currentId) {
+      if (!regs || regs.length <= 1) return;
+      const sel = document.getElementById('reg-switcher');
+      const label = document.getElementById('reg-switcher-label');
+      label.textContent = `Anda punya ${regs.length} pendaftaran — pilih untuk pindah:`;
+      sel.innerHTML = regs.map(r => `
+        <option value="${r.id}" ${r.id === currentId ? 'selected' : ''}>
+          ${escapeHtml(r.registrationNumber)} — ${escapeHtml(r.animalLabel)} (${escapeHtml(r.statusLabel)})
+        </option>`).join('');
+      document.getElementById('reg-switcher-wrap').style.display = 'block';
+    }
+
+    function renderJadwal(jadwal) {
+      const el = document.getElementById('jadwal-content');
+      if (!Array.isArray(jadwal) || jadwal.length === 0) {
+        el.innerHTML = '<div style="color:#9ca3af; font-size:13px;">Jadwal belum di-generate panitia. Mohon ditunggu — pengumuman akan disampaikan via grup sohibul.</div>';
+        return;
+      }
+      const fmtTime = (iso) => {
+        if (!iso) return '—';
+        const d = new Date(iso);
+        return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+      };
+      const fmtDate = (iso) => {
+        if (!iso) return '';
+        const d = new Date(iso);
+        const months = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+        return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+      };
+      const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+      const teamLabel = (t) => t === 'SAPI' ? 'Tim Sapi' : 'Tim Kambing/Domba';
+
+      el.innerHTML = jadwal.map((a) => {
+        if (!a.scheduledAt) {
+          return `<div style="padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.06);">
+        <div style="font-family:monospace; font-size:12px; color:#9ca3af;">${esc(a.animalCode)}</div>
+        <div style="font-size:13px; color:#fcd34d; margin-top:4px;">Jadwal belum tersedia</div>
+      </div>`;
+        }
+        return `<div style="padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.06);">
+      <div style="font-family:monospace; font-size:12px; color:#9ca3af;">${esc(a.animalCode)} • ${esc(a.animalType)}</div>
+      <div style="display:flex; gap:16px; align-items:baseline; margin-top:6px;">
+        <div style="font-size:20px; font-weight:800; color:#10b981; font-family:monospace;">${fmtTime(a.scheduledAt)}</div>
+        <div style="font-size:13px; color:#f0fdf4;">${teamLabel(a.scheduledTeam)}</div>
+      </div>
+      <div style="font-size:11px; color:#9ca3af; margin-top:4px;">${fmtDate(a.scheduledAt)}</div>
+    </div>`;
+      }).join('') +
+      `<div style="margin-top:14px; padding:10px; background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.2); border-radius:6px; font-size:12px; color:#6ee7b7;">
+    ⏰ Mohon hadir minimal 15 menit sebelum slot Anda. Update via grup sohibul atau portal ini.
+  </div>`;
+    }
+
+    async function init() {
+      try {
+        const [profile, formResponses, animals, registrations, jadwal] = await Promise.all([
+          portalApi('/me'),
+          portalApi('/form-response'),
+          portalApi('/animals'),
+          portalApi('/registrations').catch(() => []),
+          portalApi('/scheduling/me').catch(() => []),
+        ]);
+        currentShohibulName = profile.shohibulName || profile.name;
+        if (profile.impersonatedBy) {
+          document.getElementById('impersonate-banner').style.display = 'block';
+        }
+        renderProfile(profile);
+        renderFormResponse(formResponses);
+        renderAnimals(animals, profile.animalType);
+        renderJadwal(jadwal);
+        renderRegSwitcher(registrations, profile.id);
+      } catch (e) {
+        if (e.message !== 'Session expired') {
+          document.getElementById('form-response-content').innerHTML =
+            `<div style="color:#f87171; font-size:13px;">Gagal memuat data: ${e.message}</div>`;
+        }
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

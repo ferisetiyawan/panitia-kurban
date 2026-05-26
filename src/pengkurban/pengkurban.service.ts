@@ -4,10 +4,11 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Pengkurban } from './pengkurban.entity';
+import { FormResponse } from '../form-responses/form-response.entity';
 import { Event } from '../events/event.entity';
 import { CreatePengkurbanDto, UpdatePengkurbanDto } from './dto/pengkurban.dto';
 import { PublicRegisterDto } from './dto/public-register.dto';
@@ -21,21 +22,49 @@ export class PengkurbanService {
   constructor(
     @InjectRepository(Pengkurban)
     private pengkurbanRepository: Repository<Pengkurban>,
+    @InjectRepository(FormResponse)
+    private formResponseRepository: Repository<FormResponse>,
     private waNotifier: WaNotifierService,
   ) {}
 
-  async findAll(eventId?: string): Promise<Pengkurban[]> {
+  async findAll(
+    eventId?: string,
+  ): Promise<(Pengkurban & { konfirmasi_teknis_submitted_at: string | null })[]> {
     const where: any = {};
     if (eventId) where.eventId = eventId;
-    return this.pengkurbanRepository.find({
+    const entities = await this.pengkurbanRepository.find({
       where,
       relations: ['event'],
       order: { createdAt: 'DESC' },
     });
+
+    if (entities.length === 0) return entities as any[];
+
+    const formKey =
+      process.env.KONFIRMASI_TEKNIS_FORM_KEY || 'konfirmasi_teknis_1447h';
+    const ids = entities.map((e) => e.id);
+    const formResponses = await this.formResponseRepository.find({
+      where: { pengkurbanId: In(ids), formKey },
+      select: ['pengkurbanId', 'formSubmittedAt'],
+    });
+    const submittedAtMap = new Map(
+      formResponses.map((fr) => [
+        fr.pengkurbanId,
+        fr.formSubmittedAt ? fr.formSubmittedAt.toISOString() : null,
+      ]),
+    );
+
+    return entities.map((entity) => ({
+      ...entity,
+      konfirmasi_teknis_submitted_at: submittedAtMap.get(entity.id) ?? null,
+    }));
   }
 
   async exportCsv(eventId?: string): Promise<string> {
-    const data = await this.findAll(eventId);
+    const all = await this.findAll(eventId);
+    // Bendahara only wants active records — exclude REJECTED from CSV
+    // (admin list view still shows them with red badge).
+    const data = all.filter((d) => d.status !== RegistrationStatus.REJECTED);
     const header = [
       'No. Registrasi',
       'Nama Pendaftar',
@@ -55,7 +84,10 @@ export class PengkurbanService {
       'Tahun',
     ].join(',');
     const rows = data.map((d) => {
-      const infaqAmount = getInfaqAmount(d.animalType);
+      // Waiver: infaq_amount IS NULL → di-skip dari obligation (mis. bawa
+      // sendiri + potongan daging). Source of truth column, bukan default
+      // catalog lookup.
+      const waived = d.infaqAmount === null || d.infaqAmount === undefined;
       return [
         d.registrationNumber,
         d.name,
@@ -65,8 +97,8 @@ export class PengkurbanService {
         d.animalSize || '',
         d.purchaseType,
         d.price != null ? String(d.price) : '',
-        String(infaqAmount),
-        d.infaqPaid ? 'Lunas' : 'Belum',
+        waived ? '' : String(d.infaqAmount),
+        waived ? 'Waived' : d.infaqPaid ? 'Lunas' : 'Belum',
         d.infaqPaidAt ? d.infaqPaidAt.toISOString() : '',
         d.status,
         d.phone || '',
@@ -104,6 +136,12 @@ export class PengkurbanService {
       ...dto,
       registrationNumber,
       status: dto.status ?? RegistrationStatus.CONFIRMED,
+      // Default infaq_amount sesuai animal_type kalau ga di-set di DTO.
+      // DTO bisa explicitly set null untuk flag waiver.
+      infaqAmount:
+        (dto as any).infaqAmount !== undefined
+          ? (dto as any).infaqAmount
+          : getInfaqAmount(dto.animalType),
     });
     return this.pengkurbanRepository.save(pk);
   }
@@ -159,6 +197,7 @@ export class PengkurbanService {
       eventId,
       registrationNumber,
       status: RegistrationStatus.PENDING_PAYMENT,
+      infaqAmount: getInfaqAmount(dto.animalType),
     });
     const saved = await this.pengkurbanRepository.save(pk);
 

@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Operasional Hari-H - Panitia Kurban</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .ops-card { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 12px; }
+    .ops-card.current { background: rgba(16,185,129,0.18); border-color: rgba(16,185,129,0.5); }
+    .ops-card.next { background: rgba(99,102,241,0.12); border-color: rgba(99,102,241,0.3); }
+    .ops-card.done { background: rgba(107,114,128,0.1); border-color: rgba(107,114,128,0.2); opacity: 0.7; }
+    .btn-big { padding: 14px 18px; border-radius: 10px; font-weight: 700; font-size: 15px; cursor: pointer; border: none; }
+    .btn-mulai { background: #10b981; color: white; }
+    .btn-selesai { background: #2563eb; color: white; }
+    .btn-skip { background: rgba(245,158,11,0.6); color: white; }
+    .btn-foto { background: rgba(168,85,247,0.7); color: white; }
+    .btn-reset { background: rgba(107,114,128,0.5); color: white; font-size: 12px; padding: 6px 12px; }
+    .btn-bcast { background: rgba(236,72,153,0.7); color: white; font-size: 12px; padding: 6px 12px; }
+    .team-chip { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; margin-right: 6px; vertical-align: middle; }
+    .team-chip.sapi { background: rgba(245,158,11,0.25); color: #fbbf24; }
+    .team-chip.kmb { background: rgba(16,185,129,0.25); color: #34d399; }
+  </style>
+</head>
+<body>
+  <div class="bg-orb bg-orb-1"></div>
+  <div class="bg-orb bg-orb-2"></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <h1>🕌 Al Hijrah CGE</h1>
+      <p>Sistem Panitia Kurban</p>
+    </div>
+    <nav class="sidebar-nav"></nav>
+  </aside>
+  <nav class="bottom-nav" id="bottom-nav">
+    <div class="bottom-nav-items"></div>
+  </nav>
+
+  <main class="main-content">
+    <div class="top-bar">
+      <div class="flex items-center gap-3">
+        <button class="hamburger" onclick="toggleSidebar()">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+          </svg>
+        </button>
+        <h2 class="page-title">Operasional Hari-H</h2>
+      </div>
+      <div id="user-info" class="user-info"></div>
+    </div>
+
+    <!-- Public-mode nav: shown when not logged in -->
+    <div id="publicNav" class="hidden flex flex-wrap items-center gap-2 mb-3">
+      <a href="/login.html" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-sm">🔑 Login Panitia</a>
+      <a href="/daftar.html" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded text-sm">📝 Daftar Kurban</a>
+      <a href="/portal.html" class="bg-gray-200 hover:bg-gray-300 text-gray-900 px-3 py-1.5 rounded text-sm">🏠 Portal Sohibul</a>
+      <span class="text-xs text-gray-300 ml-2">View-only mode</span>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-2 mb-4">
+      <select id="eventSelect" class="border rounded p-2 bg-white text-gray-900"></select>
+      <button id="btnRefresh" class="bg-blue-600 text-white px-4 py-2 rounded">🔄 Refresh</button>
+      <span id="autoStatus" class="text-xs text-gray-300 ml-2">auto-refresh: 30s</span>
+    </div>
+
+    <div id="counts" class="text-sm text-gray-200 mb-4"></div>
+
+    <section class="mb-6">
+      <h3 class="font-bold text-lg mb-2 text-white">🔥 Sedang dipotong</h3>
+      <div id="currentList" class="space-y-2"></div>
+    </section>
+
+    <section class="mb-6">
+      <h3 class="font-bold text-lg mb-2 text-white">⏭️ Antrian berikutnya</h3>
+      <div id="nextList" class="space-y-2"></div>
+    </section>
+
+    <section class="mb-6">
+      <h3 class="font-bold text-base mb-2 text-gray-300">✅ Selesai (5 terakhir)</h3>
+      <div id="recentList" class="space-y-2"></div>
+    </section>
+
+    <!-- Photo upload modal -->
+    <div id="photoModal" class="hidden fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-lg p-4 max-w-md w-full text-gray-900">
+        <h3 class="font-bold mb-2">Upload foto hewan</h3>
+        <div id="photoAnimalLabel" class="text-sm text-gray-600 mb-3"></div>
+        <input type="file" id="photoFile" accept="image/*" capture="environment" class="mb-3 block w-full">
+        <div id="photoPreview" class="mb-3"></div>
+        <div id="photoExisting" class="mb-3 text-sm"></div>
+        <div class="flex gap-2 justify-end">
+          <button id="photoBcastBtn" class="btn-big btn-bcast" style="display:none">📨 Broadcast ke sohibul tidak-hadir</button>
+          <button id="photoCancelBtn" class="btn-big" style="background:#ccc">Tutup</button>
+          <button id="photoUploadBtn" class="btn-big btn-foto">📸 Upload</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="/js/app.js"></script>
+  <script>
+    (async () => {
+      const $ = (s) => document.querySelector(s);
+      const isLoggedIn = !!localStorage.getItem('token');
+      if (isLoggedIn) {
+        initSidebar('operasional');
+      } else {
+        // Public mode: hide sidebar + bottom nav, show top-link bar
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar) sidebar.style.display = 'none';
+        const bn = document.getElementById('bottom-nav');
+        if (bn) bn.style.display = 'none';
+        const main = document.querySelector('.main-content');
+        if (main) main.style.marginLeft = '0';
+        $('#publicNav').classList.remove('hidden');
+      }
+
+      let currentEventId = null;
+      let autoRefreshTimer = null;
+      let activePhotoAnimal = null;
+
+      const SAPI_TYPES = new Set(['SAPI_PERORANGAN', 'SAPI_KOLEKTIF_A', 'SAPI_KOLEKTIF_B', 'SAPI_KOLEKTIF_C', 'SAPI_KOLEKTIF']);
+      function teamOf(animalType) {
+        return SAPI_TYPES.has(animalType) ? 'SAPI' : 'KAMBING_DOMBA';
+      }
+      function teamBadge(animalType) {
+        const t = teamOf(animalType);
+        return t === 'SAPI'
+          ? '<span class="team-chip sapi">🐄 SAPI</span>'
+          : '<span class="team-chip kmb">🐑 KMB</span>';
+      }
+
+      function fmtTime(iso) {
+        if (!iso) return '—';
+        const d = new Date(iso);
+        return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+      }
+      function esc(s) {
+        return String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+      }
+      function getToken() { return localStorage.getItem('token'); }
+
+      // Active event id (Idul Adha 1447H). For public mode we use this directly
+      // without fetching the event list (no public /api/events endpoint).
+      const ACTIVE_EVENT_ID = '100a5311-de13-4e26-8b1d-4cac09ee3bb6';
+
+      async function loadEvents() {
+        const sel = $('#eventSelect');
+        if (isLoggedIn) {
+          try {
+            const events = await api('/events');
+            sel.innerHTML = events.map((e) =>
+              `<option value="${esc(e.id)}">${esc(e.hijriYear ?? e.name ?? e.id)}</option>`
+            ).join('');
+            currentEventId = events[0]?.id;
+          } catch (e) {
+            // Fallback to hardcoded
+            sel.innerHTML = `<option value="${ACTIVE_EVENT_ID}">Idul Adha 1447H</option>`;
+            currentEventId = ACTIVE_EVENT_ID;
+          }
+        } else {
+          sel.innerHTML = `<option value="${ACTIVE_EVENT_ID}">Idul Adha 1447H</option>`;
+          currentEventId = ACTIVE_EVENT_ID;
+          sel.disabled = true;
+        }
+        sel.onchange = () => { currentEventId = sel.value; refresh(); };
+      }
+
+      function sohibulSummary(pengkurban) {
+        if (!pengkurban || pengkurban.length === 0) return '(vendor)';
+        const names = pengkurban.map((p) => p.name).filter(Boolean);
+        if (names.length === 1) return esc(names[0]);
+        return `${esc(names[0])} <span class="text-xs text-gray-300">+${names.length - 1} kolektif</span>`;
+      }
+
+      function renderCurrentCard(it) {
+        const startedAt = it.animal.slaughterStartedAt ? fmtTime(it.animal.slaughterStartedAt) : '—';
+        return `
+          <div class="ops-card current">
+            <div class="flex justify-between items-start mb-2">
+              <div>
+                <div class="text-xl font-bold text-white">${teamBadge(it.animal.animalType)}${sohibulSummary(it.pengkurban)}</div>
+                <div class="text-xs text-gray-200 font-mono">${esc(it.animal.animalCode)} • ${esc(it.animal.animalType)}</div>
+                <div class="text-xs text-gray-200">Jadwal: ${fmtTime(it.animal.scheduledAt)} • Mulai: ${startedAt}</div>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-2 mt-3">
+              <button class="btn-big btn-selesai" data-action="done" data-id="${esc(it.animal.id)}">✅ Selesai</button>
+              <button class="btn-big btn-foto" data-action="foto" data-id="${esc(it.animal.id)}" data-label="${esc(sohibulSummary(it.pengkurban).replace(/<[^>]*>/g,''))}">📸 Foto</button>
+              <button class="btn-big btn-skip" data-action="skip" data-id="${esc(it.animal.id)}" title="Tunda (sohibul belum datang) — bisa di-Lanjutkan nanti">⏸️ Tunda</button>
+              <button class="btn-reset" data-action="reset" data-id="${esc(it.animal.id)}">↩ reset</button>
+            </div>
+          </div>
+        `;
+      }
+
+      function renderNextCard(it, isFirst) {
+        // Mulai button di SEMUA next cards (panitia di lapangan bisa skip ke hewan mana saja).
+        // First card visually highlighted; rest pakai button outline lebih kalem.
+        const btnClass = isFirst ? 'btn-big btn-mulai' : 'btn-big btn-mulai';
+        return `
+          <div class="ops-card next">
+            <div class="flex justify-between items-start gap-2">
+              <div>
+                <div class="font-bold text-white">${teamBadge(it.animal.animalType)}${sohibulSummary(it.pengkurban)}${isFirst ? ' <span class="text-xs text-emerald-300">← sesuai jadwal</span>' : ''}</div>
+                <div class="text-xs text-gray-200 font-mono">${esc(it.animal.animalCode)} • Jadwal ${fmtTime(it.animal.scheduledAt)}</div>
+              </div>
+              <button class="${btnClass}" data-action="start" data-id="${esc(it.animal.id)}">▶ Mulai</button>
+            </div>
+          </div>
+        `;
+      }
+
+      function renderDoneCard(it) {
+        const doneAt = it.animal.slaughterDoneAt ? fmtTime(it.animal.slaughterDoneAt) : '—';
+        const photos = Array.isArray(it.animal.photos) ? it.animal.photos.length : 0;
+        const isSkipped = it.animal.slaughterStatus === 'SKIPPED';
+        const statusLabel = isSkipped ? '⏸️ Ditunda (belum dipotong)' : '✅ Done';
+        // SKIPPED: prominent "Lanjutkan" button (reset back to WAITING so panitia bisa Mulai lagi)
+        const resumeBtn = isSkipped
+          ? `<button class="btn-big btn-mulai" data-action="reset" data-id="${esc(it.animal.id)}" title="Sohibul sudah datang — kembalikan ke antrian">▶ Lanjutkan</button>`
+          : `<button class="btn-reset" data-action="reset" data-id="${esc(it.animal.id)}">↩ reset</button>`;
+        return `
+          <div class="ops-card done">
+            <div class="flex justify-between items-center gap-2">
+              <div>
+                <div class="text-sm text-gray-200">${teamBadge(it.animal.animalType)}${sohibulSummary(it.pengkurban)}</div>
+                <div class="text-xs text-gray-400 font-mono">${esc(it.animal.animalCode)} • ${statusLabel} ${doneAt} • ${photos} foto</div>
+              </div>
+              <div class="flex gap-1">
+                <button class="btn-big btn-foto" data-action="foto" data-id="${esc(it.animal.id)}" data-label="${esc(sohibulSummary(it.pengkurban).replace(/<[^>]*>/g,''))}">📸</button>
+                ${resumeBtn}
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      async function refresh() {
+        if (!currentEventId) return;
+        try {
+          let data;
+          if (isLoggedIn) {
+            data = await api(`/scheduling/ops?eventId=${encodeURIComponent(currentEventId)}`);
+          } else {
+            const r = await fetch(`/api/portal/scheduling/ops-public?eventId=${encodeURIComponent(currentEventId)}`);
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            data = await r.json();
+          }
+          const wbt = data.waitingByTeam || { SAPI: 0, KAMBING_DOMBA: 0 };
+          const cbt = data.currentByTeam || { SAPI: 0, KAMBING_DOMBA: 0 };
+          const dbt = data.doneByTeam || { SAPI: 0, KAMBING_DOMBA: 0 };
+          $('#counts').innerHTML =
+            `Antri: <b>${data.waitingCount}</b> (🐄 ${wbt.SAPI} + 🐑 ${wbt.KAMBING_DOMBA}) ` +
+            `• Sedang: <b>${data.current.length}</b> (🐄 ${cbt.SAPI} + 🐑 ${cbt.KAMBING_DOMBA}) ` +
+            `• Selesai: <b>${data.doneCount}</b> (🐄 ${dbt.SAPI} + 🐑 ${dbt.KAMBING_DOMBA})`;
+          $('#currentList').innerHTML = data.current.length
+            ? data.current.map(renderCurrentCard).join('')
+            : '<div class="text-gray-400 italic text-sm">Belum ada hewan yang sedang dipotong.</div>';
+          $('#nextList').innerHTML = data.next.length
+            ? data.next.map((it, i) => renderNextCard(it, i === 0)).join('')
+            : '<div class="text-gray-400 italic text-sm">Antrian kosong.</div>';
+          $('#recentList').innerHTML = data.recent.length
+            ? data.recent.map(renderDoneCard).join('')
+            : '<div class="text-gray-400 italic text-sm">Belum ada yang selesai.</div>';
+          attachHandlers();
+          // Hide mutation buttons in public mode
+          if (!isLoggedIn) {
+            document.querySelectorAll('[data-action]').forEach((btn) => {
+              btn.style.display = 'none';
+            });
+          }
+        } catch (e) {
+          console.error('[ops refresh]', e);
+          $('#currentList').innerHTML = `<div class="text-red-400">Gagal load: ${esc(e.message || e)}</div>`;
+        }
+      }
+
+      function showOverlay(text) {
+        let overlay = document.getElementById('opOverlay');
+        if (!overlay) {
+          overlay = document.createElement('div');
+          overlay.id = 'opOverlay';
+          overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px);';
+          overlay.innerHTML = '<div style="background:rgba(255,255,255,0.97);color:#0f172a;padding:24px 32px;border-radius:14px;display:flex;align-items:center;gap:14px;font-weight:700;font-size:16px;box-shadow:0 8px 30px rgba(0,0,0,0.4);"><div class="op-spinner"></div><span id="opOverlayText">Memproses…</span></div>';
+          const style = document.createElement('style');
+          style.textContent = `.op-spinner{width:24px;height:24px;border:3px solid #e2e8f0;border-top-color:#10b981;border-radius:50%;animation:opspin 0.7s linear infinite;}@keyframes opspin{to{transform:rotate(360deg);}}`;
+          document.head.appendChild(style);
+          document.body.appendChild(overlay);
+        }
+        document.getElementById('opOverlayText').textContent = text;
+        overlay.style.display = 'flex';
+      }
+      function hideOverlay() {
+        const o = document.getElementById('opOverlay');
+        if (o) o.style.display = 'none';
+      }
+
+      function attachHandlers() {
+        document.querySelectorAll('[data-action]').forEach((btn) => {
+          btn.onclick = async () => {
+            const action = btn.dataset.action;
+            const id = btn.dataset.id;
+            if (action === 'foto') {
+              openPhotoModal(id, btn.dataset.label || '');
+              return;
+            }
+            if (action === 'skip' && !confirm('Tunda hewan ini? (sohibul belum datang — tetap bisa di-Lanjutkan nanti dari section Selesai)')) return;
+            if (action === 'reset' && !confirm('Kembalikan hewan ke antrian WAITING?')) return;
+            const overlayText = {
+              start: '▶ Memulai... (kirim JIT WA ke next sohibul)',
+              done: '✅ Menandai selesai...',
+              skip: '⏸️ Menunda...',
+              reset: '↩ Mengembalikan ke antrian...',
+            }[action] || 'Memproses…';
+            btn.disabled = true;
+            btn.style.opacity = '0.5';
+            showOverlay(overlayText);
+            try {
+              await api(`/scheduling/${encodeURIComponent(id)}/${action}`, { method: 'POST' });
+              await refresh();
+            } catch (e) {
+              alert('Gagal: ' + (e.message || e));
+              btn.disabled = false;
+              btn.style.opacity = '1';
+            } finally {
+              hideOverlay();
+            }
+          };
+        });
+      }
+
+      function openPhotoModal(animalId, label) {
+        activePhotoAnimal = animalId;
+        $('#photoAnimalLabel').textContent = label || animalId;
+        $('#photoFile').value = '';
+        $('#photoPreview').innerHTML = '';
+        $('#photoExisting').textContent = '';
+        $('#photoBcastBtn').style.display = 'none';
+        $('#photoModal').classList.remove('hidden');
+        // Preload existing photos
+        api(`/animals/${encodeURIComponent(animalId)}`).then((a) => {
+          const photos = Array.isArray(a.photos) ? a.photos : [];
+          $('#photoExisting').innerHTML = photos.length
+            ? `<div class="font-semibold mb-1">${photos.length} foto sebelumnya:</div>` + photos.map((f) =>
+              `<a href="/api/uploads/animal-photos/${esc(f)}" target="_blank" class="block text-blue-600 underline text-xs">${esc(f)}</a>`
+            ).join('')
+            : '<div class="text-gray-500">Belum ada foto.</div>';
+          if (photos.length > 0) $('#photoBcastBtn').style.display = 'inline-block';
+        }).catch(() => {});
+      }
+
+      $('#photoFile').onchange = () => {
+        const f = $('#photoFile').files[0];
+        if (!f) { $('#photoPreview').innerHTML = ''; return; }
+        const url = URL.createObjectURL(f);
+        $('#photoPreview').innerHTML = `<img src="${url}" class="max-h-48 rounded">`;
+      };
+      $('#photoCancelBtn').onclick = () => $('#photoModal').classList.add('hidden');
+      $('#photoUploadBtn').onclick = async () => {
+        const f = $('#photoFile').files[0];
+        if (!f || !activePhotoAnimal) { alert('Pilih foto dulu.'); return; }
+        const fd = new FormData();
+        fd.append('photo', f);
+        try {
+          const res = await fetch(`/api/animals/${encodeURIComponent(activePhotoAnimal)}/photo`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${getToken()}` },
+            body: fd,
+          });
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.message || `HTTP ${res.status}`);
+          }
+          alert('Foto ter-upload ✓');
+          // Reopen modal to show updated list
+          openPhotoModal(activePhotoAnimal, $('#photoAnimalLabel').textContent);
+          refresh();
+        } catch (e) {
+          alert('Upload gagal: ' + (e.message || e));
+        }
+      };
+      $('#photoBcastBtn').onclick = async () => {
+        if (!activePhotoAnimal) return;
+        if (!confirm('Kirim foto ke semua sohibul yang tidak hadir?')) return;
+        try {
+          const r = await api(`/scheduling/${encodeURIComponent(activePhotoAnimal)}/broadcast-foto`, { method: 'POST' });
+          alert(`Sent ${r.sent} dari ${r.recipients} sohibul tidak-hadir.` + (r.failed?.length ? '\nFailed: ' + r.failed.join('\n') : ''));
+        } catch (e) {
+          alert('Broadcast gagal: ' + (e.message || e));
+        }
+      };
+
+      $('#btnRefresh').onclick = refresh;
+
+      function startAutoRefresh() {
+        if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+        autoRefreshTimer = setInterval(refresh, 30000);
+      }
+
+      await loadEvents();
+      await refresh();
+      startAutoRefresh();
+    })();
+  </script>
+</body>
+</html>

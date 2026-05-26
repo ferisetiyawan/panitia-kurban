@@ -29,7 +29,7 @@
       <div class="flex gap-2 flex-wrap">
         <select id="event-filter" class="input-field" style="max-width:280px" onchange="loadData()"></select>
         <select id="status-filter" class="input-field" style="max-width:220px" onchange="loadData()">
-          <option value="">Semua Status</option>
+          <option value="">Semua Status (selain Ditolak)</option>
           <option value="PENDING_PAYMENT">Menunggu Pembayaran</option>
           <option value="PENDING_VERIFICATION">Menunggu Verifikasi</option>
           <option value="CONFIRMED">Terkonfirmasi</option>
@@ -37,6 +37,16 @@
         </select>
       </div>
       <div class="flex gap-2">
+        <div class="col-config-wrap">
+          <button class="btn-secondary" id="col-config-btn" onclick="toggleColumnConfig(event)">⚙ Kolom</button>
+          <div class="col-config-popover" id="col-config-popover" hidden>
+            <h4>Tampilkan Kolom</h4>
+            <div id="col-config-items"></div>
+            <div class="col-config-popover-footer">
+              <button class="btn-secondary btn-sm" onclick="resetColumnConfig()" style="width:100%">Reset default</button>
+            </div>
+          </div>
+        </div>
         <button class="btn-secondary" onclick="openRekapModal()">📋 Rekap WA</button>
         <button class="btn-secondary" onclick="exportCsv()">📥 Export CSV</button>
         <button class="btn-primary" onclick="openModal()">
@@ -51,20 +61,21 @@
         <table class="data-table">
           <thead>
             <tr>
-              <th>No. Reg</th>
-              <th>Nama Pendaftar</th>
-              <th>Atas Nama Qurban</th>
-              <th>Jenis Hewan</th>
-              <th>Perkiraan Total</th>
-              <th>Alamat</th>
-              <th>Bukti</th>
-              <th>Status</th>
-              <th>Infaq</th>
-              <th>Aksi</th>
+              <th data-col="regNo">No. Reg</th>
+              <th data-col="pendaftar">Nama Pendaftar</th>
+              <th data-col="atasNama">Atas Nama Qurban</th>
+              <th data-col="jenisHewan">Jenis Hewan</th>
+              <th data-col="perkiraanTotal">Perkiraan Total</th>
+              <th data-col="alamat">Alamat</th>
+              <th data-col="bukti">Bukti</th>
+              <th data-col="status">Status</th>
+              <th data-col="infaq">Infaq</th>
+              <th data-col="konfirmasi">Konfirmasi</th>
+              <th data-col="aksi">Aksi</th>
             </tr>
           </thead>
           <tbody id="data-table">
-            <tr><td colspan="10" class="text-center py-8"><div class="spinner"></div></td></tr>
+            <tr><td colspan="99" class="text-center py-8"><div class="spinner"></div></td></tr>
           </tbody>
         </table>
       </div>
@@ -87,6 +98,7 @@
             <option value="KAMBING">Kambing 🐐</option>
             <option value="SAPI_KOLEKTIF_A">Sapi Kolektif A — 350-400 kg 🐄</option>
             <option value="SAPI_KOLEKTIF_B">Sapi Kolektif B — 320-350 kg 🐄</option>
+            <option value="SAPI_KOLEKTIF_C">Sapi Kolektif C — 320-350 kg 🐄</option>
             <option value="SAPI_PERORANGAN">Sapi Perorangan 🐄</option>
           </select>
         </div>
@@ -117,6 +129,22 @@
       <div class="flex gap-3 mt-4">
         <button type="button" class="btn-secondary flex-1" onclick="closeRekapModal()">Tutup</button>
         <button type="button" class="btn-primary flex-1" onclick="salinRekap(this)">📋 Salin</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Konfirmasi Teknis detail modal -->
+  <div class="modal-overlay" id="konfirmasi-modal">
+    <div class="modal-content" style="max-width:540px">
+      <div class="modal-header">
+        <h3 id="konfirmasi-modal-title">Konfirmasi Teknis</h3>
+        <button class="modal-close" onclick="closeKonfirmasiModal()">✕</button>
+      </div>
+      <div id="konfirmasiTeknisContent" class="text-sm py-2">
+        <p class="text-white/40">Loading...</p>
+      </div>
+      <div class="flex gap-3 mt-4">
+        <button type="button" class="btn-secondary flex-1" onclick="closeKonfirmasiModal()">Tutup</button>
       </div>
     </div>
   </div>
@@ -152,6 +180,7 @@
       SAPI: 'Sapi 🐄', KAMBING: 'Kambing 🐐', DOMBA: 'Domba 🐑',
       SAPI_KOLEKTIF: 'Sapi Kolektif 🐄',
       SAPI_KOLEKTIF_A: 'Sapi Kolektif A 🐄', SAPI_KOLEKTIF_B: 'Sapi Kolektif B 🐄',
+      SAPI_KOLEKTIF_C: 'Sapi Kolektif C 🐄',
       SAPI_PERORANGAN: 'Sapi Perorangan 🐄',
     };
     const purchaseLabels = { BELI_MASJID: 'Beli via Masjid', BAWA_SENDIRI: 'Bawa Sendiri' };
@@ -171,6 +200,7 @@
       if (animalType === 'SAPI_PERORANGAN') return PRICING.sapiPerorangan.infaq;
       if (animalType === 'SAPI_KOLEKTIF_A') return PRICING.sapiKolektif.opsiA.infaq;
       if (animalType === 'SAPI_KOLEKTIF_B') return PRICING.sapiKolektif.opsiB.infaq;
+      if (animalType === 'SAPI_KOLEKTIF_C') return PRICING.sapiKolektif.opsiC.infaq;
       if (animalType === 'SAPI_KOLEKTIF') return PRICING.sapiKolektif.opsiA.infaq;
       if (animalType === 'KAMBING' || animalType === 'DOMBA') return PRICING.kambing[0].infaq;
       return 0;
@@ -179,14 +209,22 @@
     function computeExpectedTotal(row) {
       if (!PRICING) return '(loading...)';
       const at = row.animalType;
-      const infaq = getInfaq(at);
+      // infaq_amount IS NULL → waiver (no infaq added to total). Override
+      // amount (number) wins over catalog default.
+      const waived = row.infaqAmount === null;
+      const infaq = waived
+        ? 0
+        : (row.infaqAmount != null ? Number(row.infaqAmount) : getInfaq(at));
       const fmt = (n) => n.toLocaleString('id-ID');
 
       if (at === 'SAPI_KOLEKTIF_A') {
         return `Rp ${fmt(PRICING.sapiKolektif.opsiA.perOrang + infaq)} <span class="text-white/50 text-xs">(${fmt(PRICING.sapiKolektif.opsiA.perOrang)}+${fmt(infaq)})</span>`;
       }
       if (at === 'SAPI_KOLEKTIF_B') {
-        return `Rp ${fmt(PRICING.sapiKolektif.opsiB.perOrang + infaq)} <span class="text-white/50 text-xs">(${fmt(PRICING.sapiKolektif.opsiB.perOrang)}+${fmt(infaq)})</span>`;
+        return `Rp ${fmt(PRICING.sapiKolektif.opsiB.perOrang)} <span class="text-white/50 text-xs">(sudah termasuk infaq ${fmt(infaq)})</span>`;
+      }
+      if (at === 'SAPI_KOLEKTIF_C') {
+        return `Rp ${fmt(PRICING.sapiKolektif.opsiC.perOrang)} <span class="text-white/50 text-xs">(sudah termasuk infaq ${fmt(infaq)})</span>`;
       }
       if (at === 'SAPI_PERORANGAN') {
         if (row.price == null) return '<span class="text-yellow-400">(harga belum diisi)</span>';
@@ -194,6 +232,10 @@
         return `Rp ${fmt(p + infaq)} <span class="text-white/50 text-xs">(${fmt(p)}+${fmt(infaq)})</span>`;
       }
       if (at === 'KAMBING' || at === 'DOMBA') {
+        if (row.price != null) {
+          const p = Number(row.price);
+          return `Rp ${fmt(p + infaq)} <span class="text-white/50 text-xs">(${fmt(p)}+${fmt(infaq)})</span>`;
+        }
         const catalog = at === 'KAMBING' ? PRICING.kambing : PRICING.domba;
         const tier = catalog.find(t => t.size === row.animalSize);
         if (!tier) return '<span class="text-yellow-400">(tier belum diisi)</span>';
@@ -220,6 +262,92 @@
       REJECTED: 'badge-rejected',
     };
 
+    const COLUMN_DEFS_PENGKURBAN = [
+      { id: 'regNo', label: 'No. Reg' },
+      { id: 'pendaftar', label: 'Nama Pendaftar' },
+      { id: 'atasNama', label: 'Atas Nama Qurban' },
+      { id: 'jenisHewan', label: 'Jenis Hewan' },
+      { id: 'perkiraanTotal', label: 'Perkiraan Total' },
+      { id: 'alamat', label: 'Alamat' },
+      { id: 'bukti', label: 'Bukti' },
+      { id: 'status', label: 'Status' },
+      { id: 'infaq', label: 'Infaq' },
+      { id: 'konfirmasi', label: 'Konfirmasi' },
+      { id: 'aksi', label: 'Aksi' },
+    ];
+    const COLUMN_DEFAULTS_PENGKURBAN = COLUMN_DEFS_PENGKURBAN.map(c => c.id);
+
+    function applyColumnVisibilityPengkurban() {
+      const visible = getColumnPrefs('pengkurban', COLUMN_DEFAULTS_PENGKURBAN);
+      COLUMN_DEFS_PENGKURBAN.forEach(({ id }) => {
+        const hidden = !visible.includes(id);
+        document.querySelectorAll(`.data-table [data-col="${id}"]`)
+          .forEach(el => el.classList.toggle('col-hidden', hidden));
+      });
+    }
+
+    function renderColumnConfigItems() {
+      const visible = getColumnPrefs('pengkurban', COLUMN_DEFAULTS_PENGKURBAN);
+      const container = document.getElementById('col-config-items');
+      container.innerHTML = COLUMN_DEFS_PENGKURBAN.map(({ id, label }) => `
+        <label>
+          <input type="checkbox" data-col-id="${id}" ${visible.includes(id) ? 'checked' : ''}>
+          <span>${label}</span>
+        </label>
+      `).join('');
+      container.querySelectorAll('input[type="checkbox"]').forEach(input => {
+        input.addEventListener('change', onColumnToggle);
+      });
+    }
+
+    function onColumnToggle(ev) {
+      const input = ev.target;
+      const allInputs = document.querySelectorAll('#col-config-items input[type="checkbox"]');
+      const checkedCount = Array.from(allInputs).filter(i => i.checked).length;
+      if (checkedCount === 0) {
+        input.checked = true;
+        showToast('Minimal 1 kolom harus ditampilkan.', 'error');
+        return;
+      }
+      const visible = Array.from(allInputs)
+        .filter(i => i.checked)
+        .map(i => i.dataset.colId);
+      const ordered = COLUMN_DEFAULTS_PENGKURBAN.filter(id => visible.includes(id));
+      setColumnPrefs('pengkurban', ordered);
+      applyColumnVisibilityPengkurban();
+    }
+
+    function toggleColumnConfig(ev) {
+      ev.stopPropagation();
+      const popover = document.getElementById('col-config-popover');
+      const wasHidden = popover.hasAttribute('hidden');
+      if (wasHidden) {
+        renderColumnConfigItems();
+        popover.removeAttribute('hidden');
+        setTimeout(() => {
+          document.addEventListener('click', closeColumnConfigOnOutsideClick, { once: true });
+        }, 0);
+      } else {
+        popover.setAttribute('hidden', '');
+      }
+    }
+
+    function closeColumnConfigOnOutsideClick(ev) {
+      const popover = document.getElementById('col-config-popover');
+      const wrap = popover?.parentElement;
+      if (popover && !popover.hasAttribute('hidden') && wrap && !wrap.contains(ev.target)) {
+        popover.setAttribute('hidden', '');
+      } else if (popover && !popover.hasAttribute('hidden')) {
+        document.addEventListener('click', closeColumnConfigOnOutsideClick, { once: true });
+      }
+    }
+
+    function resetColumnConfig() {
+      setColumnPrefs('pengkurban', COLUMN_DEFAULTS_PENGKURBAN);
+      renderColumnConfigItems();
+      applyColumnVisibilityPengkurban();
+    }
+
     function escHtml(str) {
       return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
     }
@@ -228,9 +356,104 @@
     const urlStatus = new URLSearchParams(location.search).get('status');
     if (urlStatus) document.getElementById('status-filter').value = urlStatus;
 
+    applyColumnVisibilityPengkurban();
     Promise.all([loadPricingCatalog(), loadEventOptions('event-filter', true)])
       .then(() => loadData());
     loadEventOptions('form-event');
+
+    // Urutan grouping mirrors rekap WA section order
+    const GROUP_ORDER = [
+      'SAPI_KOLEKTIF_A', 'SAPI_KOLEKTIF_B', 'SAPI_KOLEKTIF_C', 'SAPI_KOLEKTIF',
+      'SAPI_PERORANGAN', 'KAMBING', 'DOMBA',
+    ];
+    const GROUP_HEADERS = {
+      SAPI_KOLEKTIF_A: '🐄 Sapi Kolektif A — 350-400 kg',
+      SAPI_KOLEKTIF_B: '🐄 Sapi Kolektif B — 320-350 kg',
+      SAPI_KOLEKTIF_C: '🐄 Sapi Kolektif C — 320-350 kg',
+      SAPI_KOLEKTIF: '🐄 Sapi Kolektif (legacy)',
+      SAPI_PERORANGAN: '🐄 Sapi Perorangan',
+      KAMBING: '🐐 Kambing',
+      DOMBA: '🐑 Domba',
+    };
+
+    function missing(value, icon) {
+      return value
+        ? `<span class="text-xs text-white/60">${escHtml(value)}</span>`
+        : `<span class="text-xs text-yellow-400/80" title="Belum diisi">${icon} belum diisi</span>`;
+    }
+
+    function renderPengkurbanRow(d) {
+      const proofs = d.paymentProofPaths || [];
+      const proofHtml = proofs.length
+        ? proofs.map((p, i) => `<button class="btn-secondary btn-sm" onclick="showLightbox('/api/${escHtml(p)}')">${proofs.length > 1 ? `Bukti ${i+1}` : 'Lihat'}</button>`).join(' ')
+        : (d.purchaseType === 'BAWA_SENDIRI'
+            ? '<span class="text-white/30 text-xs" title="Bawa sendiri — bukti transfer tidak diperlukan">—</span>'
+            : '<span class="text-yellow-400/80 text-xs" title="Belum upload bukti">⚠️ belum upload</span>');
+
+      const canVerify = d.status === 'PENDING_VERIFICATION' || d.status === 'PENDING_PAYMENT';
+      const verifyBtn = canVerify
+        ? `<button class="btn-primary btn-sm" onclick='openVerifyModal(${escHtml(JSON.stringify(d))})'>Verifikasi</button>`
+        : '';
+
+      // Waiver semantic: infaq_amount IS NULL = di-skip dari obligation
+      // (mis. bawa sendiri + potongan daging, institutional). Source of
+      // truth column, bukan default catalog.
+      const infaqWaived = d.infaqAmount === null;
+      const infaqAmt = infaqWaived
+        ? 0
+        : (d.infaqAmount != null ? Number(d.infaqAmount) : getInfaq(d.animalType));
+      const infaqAmountHtml = infaqWaived
+        ? `<span class="text-xs text-white/30" title="Infaq di-waive (bawa sendiri / institutional)">—</span>`
+        : `<span class="text-xs text-white/60">Rp ${infaqAmt.toLocaleString('id-ID')}</span>`;
+      const infaqBadge = infaqWaived
+        ? `<span class="badge badge-rejected" title="Waiver — di-skip dari rekap sumbangan">Waived</span>`
+        : d.infaqPaid
+        ? `<span class="badge badge-active" title="Lunas ${d.infaqPaidAt ? new Date(d.infaqPaidAt).toLocaleDateString('id-ID') : ''}">✓ Lunas</span>`
+        : `<span class="badge badge-pending">Belum</span>`;
+      const infaqBtn = infaqWaived
+        ? ''
+        : `<button class="btn-secondary btn-sm" onclick="toggleInfaq('${d.id}', ${!d.infaqPaid})">${d.infaqPaid ? 'Batalkan' : 'Tandai Lunas'}</button>`;
+
+      // Phone shown under name. Yellow indicator kalau missing — biar gampang
+      // di-spot pas reconcile.
+      const phoneHtml = d.phone
+        ? `<div class="text-xs text-white/50">📱 ${escHtml(d.phone)}</div>`
+        : `<div class="text-xs text-yellow-400/80" title="No. HP belum diisi">📱 belum diisi</div>`;
+
+      return `<tr>
+        <td data-col="regNo" class="text-xs font-mono text-emerald-300/70">${escHtml(d.registrationNumber || '—')}</td>
+        <td data-col="pendaftar"><div class="font-semibold">${escHtml(d.name)}</div>${phoneHtml}</td>
+        <td data-col="atasNama" class="text-xs text-white/70">${escHtml(d.shohibulName || '—')}</td>
+        <td data-col="jenisHewan">${escHtml(animalLabels[d.animalType] || d.animalType)}</td>
+        <td data-col="perkiraanTotal" class="text-xs text-white/70">${computeExpectedTotal(d)}</td>
+        <td data-col="alamat">${missing(d.address, '📍')}</td>
+        <td data-col="bukti">${proofHtml}</td>
+        <td data-col="status"><span class="badge ${statusBadge[d.status] || ''}">${statusLabels[d.status] || d.status}</span></td>
+        <td data-col="infaq"><div class="flex flex-col gap-1 items-start">
+          ${infaqAmountHtml}
+          ${infaqBadge}
+        </div></td>
+        ${d.konfirmasi_teknis_submitted_at
+          ? `<td data-col="konfirmasi" class="text-center" title="Submitted: ${new Date(d.konfirmasi_teknis_submitted_at).toLocaleString('id-ID')}"><button class="text-green-400 hover:text-green-300 cursor-pointer" onclick='openKonfirmasiModal(${escHtml(JSON.stringify(d.id))}, ${escHtml(JSON.stringify(d.name))})'>✓</button></td>`
+          : `<td data-col="konfirmasi" class="text-center"><button class="text-white/30 hover:text-yellow-400/70 cursor-pointer text-xs" onclick='openKonfirmasiModal(${escHtml(JSON.stringify(d.id))}, ${escHtml(JSON.stringify(d.name))})'>—</button></td>`}
+        <td data-col="aksi"><div class="flex gap-2 flex-wrap">
+          ${verifyBtn}
+          ${infaqBtn}
+          <button class="btn-secondary btn-sm" onclick='editData(${escHtml(JSON.stringify(d))})'>Edit</button>
+          <button class="btn-secondary btn-sm" title="Buka portal sebagai sohibul ini" onclick="impersonateSohibul('${d.id}')">🔎 Lihat as Sohibul</button>
+          <button class="btn-danger btn-sm" onclick="deleteData('${d.id}')">Hapus</button>
+        </div></td>
+      </tr>`;
+    }
+
+    function renderGroupHeader(label, count) {
+      return `<tr class="bg-emerald-900/40">
+        <td colspan="99" class="font-semibold text-emerald-200 py-2 px-3">
+          ${label}
+          <span class="text-emerald-400/60 text-xs ml-2">(${count} orang)</span>
+        </td>
+      </tr>`;
+    }
 
     async function loadData() {
       const eventId = document.getElementById('event-filter').value;
@@ -239,52 +462,44 @@
       if (eventId) params.set('eventId', eventId);
       try {
         let data = await api(`/pengkurban?${params}`);
-        if (status) data = data.filter(d => d.status === status);
+        if (status) {
+          data = data.filter(d => d.status === status);
+        } else {
+          data = data.filter(d => d.status !== 'REJECTED');
+        }
 
         const tbody = document.getElementById('data-table');
         if (!data.length) {
-          tbody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-emerald-300/40">Belum ada data pengkurban</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="99" class="text-center py-8 text-emerald-300/40">Belum ada data pengkurban</td></tr>';
           return;
         }
 
-        tbody.innerHTML = data.map(d => {
-          const proofs = d.paymentProofPaths || [];
-          const proofHtml = proofs.length
-            ? proofs.map((p, i) => `<button class="btn-secondary btn-sm" onclick="showLightbox('/api/${escHtml(p)}')">${proofs.length > 1 ? `Bukti ${i+1}` : 'Lihat'}</button>`).join(' ')
-            : '<span class="text-white/30 text-xs">—</span>';
+        // Group by animal_type, sort within group by createdAt ASC
+        const groups = {};
+        data.forEach(d => {
+          const key = d.animalType || 'UNKNOWN';
+          (groups[key] ||= []).push(d);
+        });
+        Object.values(groups).forEach(rows =>
+          rows.sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0))
+        );
 
-          const canVerify = d.status === 'PENDING_VERIFICATION' || d.status === 'PENDING_PAYMENT';
-          const verifyBtn = canVerify
-            ? `<button class="btn-primary btn-sm" onclick='openVerifyModal(${escHtml(JSON.stringify(d))})'>Verifikasi</button>`
-            : '';
+        // Render in defined order, then any unknown types at the end
+        const html = [];
+        for (const key of GROUP_ORDER) {
+          const rows = groups[key];
+          if (!rows || !rows.length) continue;
+          html.push(renderGroupHeader(GROUP_HEADERS[key] || key, rows.length));
+          html.push(rows.map(renderPengkurbanRow).join(''));
+        }
+        for (const key of Object.keys(groups)) {
+          if (GROUP_ORDER.includes(key)) continue;
+          html.push(renderGroupHeader(key, groups[key].length));
+          html.push(groups[key].map(renderPengkurbanRow).join(''));
+        }
 
-          const infaqAmt = getInfaq(d.animalType);
-          const infaqBadge = d.infaqPaid
-            ? `<span class="badge badge-active" title="Lunas ${d.infaqPaidAt ? new Date(d.infaqPaidAt).toLocaleDateString('id-ID') : ''}">✓ Lunas</span>`
-            : `<span class="badge badge-pending">Belum</span>`;
-          const infaqBtn = `<button class="btn-secondary btn-sm" onclick="toggleInfaq('${d.id}', ${!d.infaqPaid})">${d.infaqPaid ? 'Batalkan' : 'Tandai Lunas'}</button>`;
-
-          return `<tr>
-            <td class="text-xs font-mono text-emerald-300/70">${escHtml(d.registrationNumber || '—')}</td>
-            <td class="font-semibold">${escHtml(d.name)}</td>
-            <td class="text-xs text-white/70">${escHtml(d.shohibulName || '—')}</td>
-            <td>${escHtml(animalLabels[d.animalType] || d.animalType)}</td>
-            <td class="text-xs text-white/70">${computeExpectedTotal(d)}</td>
-            <td class="text-xs text-white/60">${escHtml(d.address || '—')}</td>
-            <td>${proofHtml}</td>
-            <td><span class="badge ${statusBadge[d.status] || ''}">${statusLabels[d.status] || d.status}</span></td>
-            <td><div class="flex flex-col gap-1 items-start">
-              <span class="text-xs text-white/60">Rp ${infaqAmt.toLocaleString('id-ID')}</span>
-              ${infaqBadge}
-            </div></td>
-            <td><div class="flex gap-2 flex-wrap">
-              ${verifyBtn}
-              ${infaqBtn}
-              <button class="btn-secondary btn-sm" onclick='editData(${escHtml(JSON.stringify(d))})'>Edit</button>
-              <button class="btn-danger btn-sm" onclick="deleteData('${d.id}')">Hapus</button>
-            </div></td>
-          </tr>`;
-        }).join('');
+        tbody.innerHTML = html.join('');
+        applyColumnVisibilityPengkurban();
       } catch (err) { showToast('Gagal memuat data', 'error'); }
     }
 
@@ -380,6 +595,27 @@
 
     function closeVerifyModal() { document.getElementById('verify-modal').classList.remove('active'); }
 
+    async function impersonateSohibul(pengkurbanId) {
+      try {
+        const res = await fetch(`/api/portal/auth/impersonate/${pengkurbanId}`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${getToken()}` },
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          showToast(data.message || 'Gagal impersonate', 'error');
+          return;
+        }
+        // Set portal token in this tab so dashboard inherits via localStorage
+        // (tradeoff: overwrites admin's own portal session if they had one)
+        localStorage.setItem('portalToken', data.token);
+        localStorage.setItem('portalUser', JSON.stringify(data.pengkurban));
+        window.open('/portal-dashboard.html', '_blank');
+      } catch (err) {
+        showToast('Gagal impersonate: ' + err.message, 'error');
+      }
+    }
+
     async function toggleInfaq(id, paid) {
       try {
         await api(`/pengkurban/${id}/infaq`, {
@@ -425,6 +661,66 @@
         closeVerifyModal();
         loadData();
       } catch (err) { showToast(err.message, 'error'); }
+    }
+
+    const KONFIRMASI_FORM_KEY = 'konfirmasi_teknis_1447h';
+    const KONFIRMASI_SKIP_KEYS = new Set(['Timestamp']);
+    const KONFIRMASI_STRAY_KEY_RE = /^Column \d+$/;       // stray Google sheet placeholders
+    const KONFIRMASI_REG_VALUE_RE = /REG-\d{4}-\d{4}/;    // nama dropdown value (already in modal title)
+
+    function openKonfirmasiModal(pengkurbanId, name) {
+      document.getElementById('konfirmasi-modal-title').textContent = `Konfirmasi Teknis — ${name}`;
+      document.getElementById('konfirmasiTeknisContent').innerHTML = '<p class="text-white/40">Loading...</p>';
+      document.getElementById('konfirmasi-modal').classList.add('active');
+      loadKonfirmasiTeknis(pengkurbanId);
+    }
+
+    function closeKonfirmasiModal() {
+      document.getElementById('konfirmasi-modal').classList.remove('active');
+    }
+
+    async function loadKonfirmasiTeknis(pengkurbanId) {
+      const container = document.getElementById('konfirmasiTeknisContent');
+      try {
+        const res = await fetch(
+          `/api/form-responses?pengkurban_id=${encodeURIComponent(pengkurbanId)}&form_key=${KONFIRMASI_FORM_KEY}`,
+          { headers: { 'Authorization': `Bearer ${getToken()}` } }
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const result = await res.json();
+
+        if (result.submitted) {
+          const rows = Object.entries(result.data)
+            .filter(([k, v]) => {
+              if (KONFIRMASI_SKIP_KEYS.has(k)) return false;
+              if (KONFIRMASI_STRAY_KEY_RE.test(k)) return false;
+              if (KONFIRMASI_REG_VALUE_RE.test(v)) return false;
+              return true;
+            })
+            .map(([k, v]) => `
+              <div class="mb-3">
+                <div class="text-white/50 text-xs mb-0.5">${escHtml(k)}</div>
+                <div class="text-white/90">${escHtml(v || '(kosong)')}</div>
+              </div>
+            `).join('');
+          const submittedAt = new Date(result.form_submitted_at).toLocaleString('id-ID');
+          container.innerHTML = `
+            <p class="text-xs text-white/40 mb-4">Submitted: ${escHtml(submittedAt)}</p>
+            ${rows}
+          `;
+        } else {
+          const prefillBtn = result.prefill_url
+            ? `<button onclick='navigator.clipboard.writeText(${escHtml(JSON.stringify(result.prefill_url))}); this.textContent="✓ Tersalin"' class="mt-2 btn-secondary btn-sm">Salin pre-filled link</button>`
+            : '';
+          container.innerHTML = `
+            <p class="text-yellow-300/70">⚠ Belum mengisi form konfirmasi teknis</p>
+            ${prefillBtn}
+          `;
+        }
+      } catch (e) {
+        console.error('[konfirmasi-teknis]', e.stack || e.message);
+        container.innerHTML = `<p class="text-red-400">Error: ${escHtml(e.message)}</p>`;
+      }
     }
   </script>
 </body>

@@ -18,6 +18,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (!user || !user.isActive) {
       throw new UnauthorizedException('User tidak aktif');
     }
-    return { id: user.id, username: user.username, role: user.role, fullName: user.fullName };
+    return {
+      id: user.id,
+      username: user.username,
+      role: user.role,
+      fullName: user.fullName,
+    };
   }
 }

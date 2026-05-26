@@ -36,8 +36,20 @@
           <option value="REJECTED">Ditolak</option>
         </select>
       </div>
-      <button class="btn-secondary" onclick="openRekapModal()">📋 Rekap WA</button>
-      <button class="btn-secondary" onclick="exportCsv()">📥 Export CSV</button>
+      <div class="flex gap-2">
+        <div class="col-config-wrap">
+          <button class="btn-secondary" id="col-config-btn" onclick="toggleColumnConfig(event)">⚙ Kolom</button>
+          <div class="col-config-popover" id="col-config-popover" hidden>
+            <h4>Tampilkan Kolom</h4>
+            <div id="col-config-items"></div>
+            <div class="col-config-popover-footer">
+              <button class="btn-secondary btn-sm" onclick="resetColumnConfig()" style="width:100%">Reset default</button>
+            </div>
+          </div>
+        </div>
+        <button class="btn-secondary" onclick="openRekapModal()">📋 Rekap WA</button>
+        <button class="btn-secondary" onclick="exportCsv()">📥 Export CSV</button>
+      </div>
     </div>
 
     <!-- Total card -->
@@ -61,17 +73,17 @@
         <table class="data-table">
           <thead>
             <tr>
-              <th>Nama</th>
-              <th>No. WA</th>
-              <th>Nominal</th>
-              <th>Bukti</th>
-              <th>Status</th>
-              <th>Waktu</th>
-              <th>Aksi</th>
+              <th data-col="nama">Nama</th>
+              <th data-col="noWa">No. WA</th>
+              <th data-col="nominal">Nominal</th>
+              <th data-col="bukti">Bukti</th>
+              <th data-col="status">Status</th>
+              <th data-col="waktu">Waktu</th>
+              <th data-col="aksi">Aksi</th>
             </tr>
           </thead>
           <tbody id="data-table">
-            <tr><td colspan="7" class="text-center py-8"><div class="spinner"></div></td></tr>
+            <tr><td colspan="99" class="text-center py-8"><div class="spinner"></div></td></tr>
           </tbody>
         </table>
       </div>
@@ -130,9 +142,92 @@
       REJECTED: 'badge-rejected',
     };
 
+    const COLUMN_DEFS_DONATIONS = [
+      { id: 'nama', label: 'Nama' },
+      { id: 'noWa', label: 'No. WA' },
+      { id: 'nominal', label: 'Nominal' },
+      { id: 'bukti', label: 'Bukti' },
+      { id: 'status', label: 'Status' },
+      { id: 'waktu', label: 'Waktu' },
+      { id: 'aksi', label: 'Aksi' },
+    ];
+    const COLUMN_DEFAULTS_DONATIONS = COLUMN_DEFS_DONATIONS.map(c => c.id);
+
+    function applyColumnVisibilityDonations() {
+      const visible = getColumnPrefs('donations', COLUMN_DEFAULTS_DONATIONS);
+      COLUMN_DEFS_DONATIONS.forEach(({ id }) => {
+        const hidden = !visible.includes(id);
+        document.querySelectorAll(`.data-table [data-col="${id}"]`)
+          .forEach(el => el.classList.toggle('col-hidden', hidden));
+      });
+    }
+
+    function renderColumnConfigItems() {
+      const visible = getColumnPrefs('donations', COLUMN_DEFAULTS_DONATIONS);
+      const container = document.getElementById('col-config-items');
+      container.innerHTML = COLUMN_DEFS_DONATIONS.map(({ id, label }) => `
+        <label>
+          <input type="checkbox" data-col-id="${id}" ${visible.includes(id) ? 'checked' : ''}>
+          <span>${label}</span>
+        </label>
+      `).join('');
+      container.querySelectorAll('input[type="checkbox"]').forEach(input => {
+        input.addEventListener('change', onColumnToggle);
+      });
+    }
+
+    function onColumnToggle(ev) {
+      const input = ev.target;
+      const allInputs = document.querySelectorAll('#col-config-items input[type="checkbox"]');
+      const checkedCount = Array.from(allInputs).filter(i => i.checked).length;
+      if (checkedCount === 0) {
+        input.checked = true;
+        showToast('Minimal 1 kolom harus ditampilkan.', 'error');
+        return;
+      }
+      const visible = Array.from(allInputs)
+        .filter(i => i.checked)
+        .map(i => i.dataset.colId);
+      const ordered = COLUMN_DEFAULTS_DONATIONS.filter(id => visible.includes(id));
+      setColumnPrefs('donations', ordered);
+      applyColumnVisibilityDonations();
+    }
+
+    function toggleColumnConfig(ev) {
+      ev.stopPropagation();
+      const popover = document.getElementById('col-config-popover');
+      const wasHidden = popover.hasAttribute('hidden');
+      if (wasHidden) {
+        renderColumnConfigItems();
+        popover.removeAttribute('hidden');
+        setTimeout(() => {
+          document.addEventListener('click', closeColumnConfigOnOutsideClick, { once: true });
+        }, 0);
+      } else {
+        popover.setAttribute('hidden', '');
+      }
+    }
+
+    function closeColumnConfigOnOutsideClick(ev) {
+      const popover = document.getElementById('col-config-popover');
+      const wrap = popover?.parentElement;
+      if (popover && !popover.hasAttribute('hidden') && wrap && !wrap.contains(ev.target)) {
+        popover.setAttribute('hidden', '');
+      } else if (popover && !popover.hasAttribute('hidden')) {
+        document.addEventListener('click', closeColumnConfigOnOutsideClick, { once: true });
+      }
+    }
+
+    function resetColumnConfig() {
+      setColumnPrefs('donations', COLUMN_DEFAULTS_DONATIONS);
+      renderColumnConfigItems();
+      applyColumnVisibilityDonations();
+    }
+
     const urlStatus = new URLSearchParams(location.search).get('status');
     if (urlStatus) document.getElementById('status-filter').value = urlStatus;
 
+    applyColumnVisibilityDonations();
     loadEventOptions('event-filter', true).then(() => loadData());
 
     async function loadData() {
@@ -157,7 +252,7 @@
 
         const tbody = document.getElementById('data-table');
         if (!data.length) {
-          tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-emerald-300/40">Belum ada data sumbangan</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="99" class="text-center py-8 text-emerald-300/40">Belum ada data sumbangan</td></tr>';
           return;
         }
 
@@ -169,29 +264,30 @@
 
           const canVerify = d.status === 'PENDING_VERIFICATION';
           const verifyBtn = canVerify
-            ? `<button class="btn-primary btn-sm" onclick='openVerifyModal(${JSON.stringify(d)})'>Verifikasi</button>`
+            ? `<button class="btn-primary btn-sm" onclick='openVerifyModal(${escHtml(JSON.stringify(d))})'>Verifikasi</button>`
             : '';
 
           return `<tr>
-            <td class="font-semibold">${escHtml(d.name)}</td>
-            <td>${escHtml(d.phone || '—')}</td>
-            <td>${d.amount != null ? 'Rp ' + Number(d.amount).toLocaleString('id-ID') : '<span class="text-white/30">Seikhlasnya</span>'}</td>
-            <td>${proofHtml}</td>
-            <td><span class="badge ${statusBadge[d.status] || ''}">${statusLabels[d.status] || d.status}</span></td>
-            <td class="text-xs text-white/50">${formatDate(d.createdAt)}</td>
-            <td><div class="flex gap-2">
+            <td data-col="nama" class="font-semibold">${escHtml(d.name)}</td>
+            <td data-col="noWa">${escHtml(d.phone || '—')}</td>
+            <td data-col="nominal">${d.amount != null ? 'Rp ' + Number(d.amount).toLocaleString('id-ID') : '<span class="text-white/30">Seikhlasnya</span>'}</td>
+            <td data-col="bukti">${proofHtml}</td>
+            <td data-col="status"><span class="badge ${statusBadge[d.status] || ''}">${statusLabels[d.status] || d.status}</span></td>
+            <td data-col="waktu" class="text-xs text-white/50">${formatDate(d.createdAt)}</td>
+            <td data-col="aksi"><div class="flex gap-2">
               ${verifyBtn}
               <button class="btn-danger btn-sm" onclick="deleteData('${d.id}')">Hapus</button>
             </div></td>
           </tr>`;
         }).join('');
+        applyColumnVisibilityDonations();
       } catch (err) {
         showToast('Gagal memuat data: ' + err.message, 'error');
       }
     }
 
     function escHtml(str) {
-      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
     }
 
     function formatDate(iso) {

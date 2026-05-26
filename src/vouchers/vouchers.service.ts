@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as QRCode from 'qrcode';
@@ -22,11 +26,18 @@ export class VouchersService {
     @InjectRepository(Event)
     private eventsRepository: Repository<Event>,
     private vouchersGateway: VouchersGateway,
-  ) { }
+  ) {}
 
-
-
-  async findAll(eventId?: string, status?: string, search?: string, distributionDate?: string, page?: number, limit?: number): Promise<any> {
+  async findAll(
+    eventId?: string,
+    status?: string,
+    search?: string,
+    distributionDate?: string,
+    page?: number,
+    limit?: number,
+    pickupCluster?: string,
+    pickupSearch?: string,
+  ): Promise<any> {
     const qb = this.vouchersRepository
       .createQueryBuilder('v')
       .leftJoinAndSelect('v.event', 'event')
@@ -44,7 +55,18 @@ export class VouchersService {
       qb.andWhere('v.voucher_code ILIKE :search', { search: `%${search}%` });
     }
     if (distributionDate) {
-      qb.andWhere('v.distribution_date = :distributionDate', { distributionDate });
+      qb.andWhere('v.distribution_date = :distributionDate', {
+        distributionDate,
+      });
+    }
+    if (pickupCluster) {
+      qb.andWhere('v.pickup_cluster = :pickupCluster', { pickupCluster });
+    }
+    if (pickupSearch) {
+      qb.andWhere(
+        '(v.pickup_unit ILIKE :pickupSearch OR v.pickup_phone ILIKE :pickupSearch OR v.pickup_cluster ILIKE :pickupSearch)',
+        { pickupSearch: `%${pickupSearch}%` },
+      );
     }
 
     if (page && limit) {
@@ -59,7 +81,7 @@ export class VouchersService {
         total,
         page: Number(page),
         limit: Number(limit),
-        totalPages: Math.ceil(total / limit)
+        totalPages: Math.ceil(total / limit),
       };
     } else {
       const vouchers = await qb.getMany();
@@ -73,18 +95,39 @@ export class VouchersService {
 
   async exportCsv(eventId?: string, status?: string): Promise<string> {
     const vouchers = (await this.findAll(eventId, status)) as Voucher[];
-    const header = ['Kode Voucher', 'Event', 'Tahun', 'Status', 'Tgl Distribusi', 'Dibuat Oleh', 'Diklaim Oleh', 'Tgl Klaim'].join(',');
+    const header = [
+      'Kode Voucher',
+      'Event',
+      'Tahun',
+      'Status',
+      'Tgl Distribusi',
+      'Dibuat Oleh',
+      'Cluster Pickup',
+      'Unit Pickup',
+      'No HP Pickup',
+      'Tgl Pickup',
+      'Diklaim Oleh',
+      'Tgl Klaim',
+    ].join(',');
     const rows = vouchers.map((v: Voucher) => {
       return [
         v.voucherCode,
         v.event?.name || '',
         v.event?.year || '',
         v.status,
-        v.distributionDate ? new Date(v.distributionDate).toISOString().split('T')[0] : '',
+        v.distributionDate
+          ? new Date(v.distributionDate).toISOString().split('T')[0]
+          : '',
         v.createdBy?.fullName || '',
+        v.pickupCluster || '',
+        v.pickupUnit || '',
+        v.pickupPhone || '',
+        v.pickedUpAt ? new Date(v.pickedUpAt).toISOString() : '',
         v.claimedBy?.fullName || '',
         v.claimedAt ? new Date(v.claimedAt).toISOString() : '',
-      ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(',');
+      ]
+        .map((field) => `"${String(field).replace(/"/g, '""')}"`)
+        .join(',');
     });
     return [header, ...rows].join('\n');
   }
@@ -92,7 +135,13 @@ export class VouchersService {
   async findById(id: string): Promise<Voucher> {
     const voucher = await this.vouchersRepository.findOne({
       where: { id },
-      relations: ['event', 'createdBy', 'claimedBy', 'scanLogs', 'scanLogs.scannedBy'],
+      relations: [
+        'event',
+        'createdBy',
+        'claimedBy',
+        'scanLogs',
+        'scanLogs.scannedBy',
+      ],
     });
     if (!voucher) throw new NotFoundException('Voucher tidak ditemukan');
     return voucher;
@@ -107,29 +156,48 @@ export class VouchersService {
     return voucher;
   }
 
-  async create(eventId: string, distributionDate: string, userId: string): Promise<Voucher> {
-    const event = await this.eventsRepository.findOne({ where: { id: eventId } });
+  async create(
+    eventId: string,
+    distributionDate: string,
+    userId: string,
+  ): Promise<Voucher> {
+    const event = await this.eventsRepository.findOne({
+      where: { id: eventId },
+    });
     if (!event) throw new NotFoundException('Event tidak ditemukan');
 
     // Validate distribution date is within event date range
     this.validateDistributionDate(distributionDate, event);
 
-    const voucherCode = await this.generateUniqueCode(distributionDate ? new Date(distributionDate) : new Date());
-    const qrData = JSON.stringify({ code: voucherCode, eventId, year: event.year });
+    const voucherCode = await this.generateUniqueCode(
+      distributionDate ? new Date(distributionDate) : new Date(),
+    );
+    const qrData = JSON.stringify({
+      code: voucherCode,
+      eventId,
+      year: event.year,
+    });
     const qrDataUrl = await QRCode.toDataURL(qrData, { width: 300, margin: 1 });
 
     const voucher = this.vouchersRepository.create({
       eventId,
       voucherCode,
       qrData: qrDataUrl,
-      distributionDate: distributionDate ? new Date(distributionDate) : undefined,
+      distributionDate: distributionDate
+        ? new Date(distributionDate)
+        : undefined,
       createdById: userId,
     });
 
-    return this.vouchersRepository.save(voucher) as Promise<Voucher>;
+    return this.vouchersRepository.save(voucher);
   }
 
-  async createBatch(eventId: string, count: number, distributionDate: string, userId: string): Promise<Voucher[]> {
+  async createBatch(
+    eventId: string,
+    count: number,
+    distributionDate: string,
+    userId: string,
+  ): Promise<Voucher[]> {
     const vouchers: Voucher[] = [];
     for (let i = 0; i < count; i++) {
       const voucher = await this.create(eventId, distributionDate, userId);
@@ -138,7 +206,10 @@ export class VouchersService {
     return vouchers;
   }
 
-  async scan(voucherCode: string, userId: string): Promise<{ voucher: Voucher; message: string }> {
+  async scan(
+    voucherCode: string,
+    userId: string,
+  ): Promise<{ voucher: Voucher; message: string; pickupInfo?: string }> {
     let voucher: Voucher;
     try {
       voucher = await this.findByCode(voucherCode);
@@ -167,6 +238,19 @@ export class VouchersService {
       throw new BadRequestException('Voucher sudah dibatalkan');
     }
 
+    // Build pickup info before claiming (read fields before they're cleared)
+    let pickupInfo: string | undefined;
+    if (voucher.pickupCluster) {
+      const dateStr = voucher.pickedUpAt
+        ? new Date(voucher.pickedUpAt).toLocaleDateString('id-ID', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+          })
+        : '-';
+      pickupInfo = `Diambil oleh ${voucher.pickupCluster} ${voucher.pickupUnit || ''} pada ${dateStr}`.trim();
+    }
+
     // Claim the voucher
     voucher.status = VoucherStatus.CLAIMED;
     voucher.claimedById = userId;
@@ -184,10 +268,73 @@ export class VouchersService {
     // Notify connected clients (Dashboard)
     this.vouchersGateway.notifyVoucherClaimed({ voucherCode });
 
-    return { voucher: saved, message: 'Voucher berhasil diklaim!' };
+    return { voucher: saved, message: 'Voucher berhasil diklaim!', pickupInfo };
   }
 
+  async scanPickup(
+    voucherCode: string,
+    userId: string,
+    pickupCluster: string,
+    pickupUnit: string,
+    pickupPhone: string | undefined,
+  ): Promise<{ voucher: Voucher; message: string }> {
+    let voucher: Voucher;
+    try {
+      voucher = await this.findByCode(voucherCode);
+    } catch {
+      throw new NotFoundException('Voucher tidak ditemukan');
+    }
 
+    if (voucher.status === VoucherStatus.DISTRIBUTED) {
+      await this.scanLogsRepository.save({
+        voucherId: voucher.id,
+        scannedById: userId,
+        action: 'REJECTED',
+        notes: 'Voucher sudah diambil sebelumnya',
+      });
+      throw new BadRequestException('Voucher sudah diambil sebelumnya');
+    }
+
+    if (voucher.status === VoucherStatus.CLAIMED) {
+      await this.scanLogsRepository.save({
+        voucherId: voucher.id,
+        scannedById: userId,
+        action: 'REJECTED',
+        notes: 'Voucher sudah diklaim di hari H',
+      });
+      throw new BadRequestException('Voucher sudah diklaim di hari H');
+    }
+
+    if (voucher.status === VoucherStatus.CANCELLED) {
+      await this.scanLogsRepository.save({
+        voucherId: voucher.id,
+        scannedById: userId,
+        action: 'REJECTED',
+        notes: 'Voucher sudah dibatalkan',
+      });
+      throw new BadRequestException('Voucher sudah dibatalkan');
+    }
+
+    voucher.status = VoucherStatus.DISTRIBUTED;
+    voucher.pickupCluster = pickupCluster;
+    voucher.pickupUnit = pickupUnit;
+    voucher.pickupPhone = pickupPhone ?? null;
+    voucher.pickedUpAt = new Date();
+    voucher.pickedUpById = userId;
+    const saved = await this.vouchersRepository.save(voucher);
+
+    await this.scanLogsRepository.save({
+      voucherId: voucher.id,
+      scannedById: userId,
+      action: 'PICKUP',
+      notes: `Voucher diambil oleh ${pickupCluster} ${pickupUnit}`,
+    });
+
+    return {
+      voucher: saved,
+      message: 'Voucher berhasil dicatat sebagai sudah diambil',
+    };
+  }
 
   async generateBatchPdf(eventId: string): Promise<Buffer> {
     const vouchers = await this.vouchersRepository.find({
@@ -205,7 +352,7 @@ export class VouchersService {
 
   async generateSelectedPdf(ids: string[]): Promise<Buffer> {
     const vouchers = await this.vouchersRepository.find({
-      where: ids.map(id => ({ id })),
+      where: ids.map((id) => ({ id })),
       relations: ['event'],
       order: { voucherCode: 'ASC' },
     });
@@ -218,7 +365,6 @@ export class VouchersService {
   }
 
   private generatePdfBuffer(vouchers: Voucher[]): Promise<Buffer> {
-
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument({
         size: 'A4',
@@ -239,7 +385,9 @@ export class VouchersService {
       const CARD_GAP = 8;
       const usableHeight = PAGE_HEIGHT - PAGE_PADDING_TOP - PAGE_PADDING_BOTTOM;
       // (5 * cardH) + (4 * CARD_GAP) = usableHeight
-      const CARD_H = Math.floor((usableHeight - (ITEMS_PER_PAGE - 1) * CARD_GAP) / ITEMS_PER_PAGE);
+      const CARD_H = Math.floor(
+        (usableHeight - (ITEMS_PER_PAGE - 1) * CARD_GAP) / ITEMS_PER_PAGE,
+      );
       const CARD_X = 18;
       const CARD_W = 595.28 - 2 * CARD_X;
 
@@ -261,14 +409,16 @@ export class VouchersService {
         // ═══════════════════════════════════════════════════
         // Layout constants relative to card
         // ═══════════════════════════════════════════════════
-        const SEP_X = CARD_X + 400;             // Dotted separator x
-        const L = CARD_X + 18;                  // Left content margin
-        const R_X = SEP_X + 14;                 // Right panel content start
+        const SEP_X = CARD_X + 400; // Dotted separator x
+        const L = CARD_X + 18; // Left content margin
+        const R_X = SEP_X + 14; // Right panel content start
         const R_W = CARD_X + CARD_W - R_X - 10; // Right panel content width
 
         // ─── Card Background ───
         doc.save();
-        doc.roundedRect(CARD_X, y, CARD_W, CARD_H, 6).fillAndStroke('#ffffff', '#e5e7eb');
+        doc
+          .roundedRect(CARD_X, y, CARD_W, CARD_H, 6)
+          .fillAndStroke('#ffffff', '#e5e7eb');
         doc.restore();
 
         // ─── Top color bar (clipped inside rounded rect) ───
@@ -287,24 +437,34 @@ export class VouchersService {
         // ─── Background Watermark Logo ───
         doc.save();
         const WM_SIZE = 150;
-        const WM_X = CARD_X + (CARD_W / 2) - (WM_SIZE / 2) - 40; // shift a bit to left of center to fit better
-        const WM_Y = y + (CARD_H / 2) - (WM_SIZE / 2);
+        const WM_X = CARD_X + CARD_W / 2 - WM_SIZE / 2 - 40; // shift a bit to left of center to fit better
+        const WM_Y = y + CARD_H / 2 - WM_SIZE / 2;
 
         let hasLogo = false;
         if (voucher.event?.logoPath) {
-          const logoFile = path.join(process.cwd(), voucher.event.logoPath.replace('/api/uploads/', 'uploads/'));
+          const logoFile = path.join(
+            process.cwd(),
+            voucher.event.logoPath.replace('/api/uploads/', 'uploads/'),
+          );
           if (fs.existsSync(logoFile)) {
             try {
               doc.opacity(0.1);
-              doc.image(logoFile, WM_X, WM_Y, { width: WM_SIZE, height: WM_SIZE });
+              doc.image(logoFile, WM_X, WM_Y, {
+                width: WM_SIZE,
+                height: WM_SIZE,
+              });
               hasLogo = true;
               doc.opacity(1);
-            } catch (e) { /* skip */ }
+            } catch (e) {
+              /* skip */
+            }
           }
         }
         if (!hasLogo) {
           doc.opacity(0.1);
-          doc.roundedRect(WM_X, WM_Y, WM_SIZE, WM_SIZE, 20).fillAndStroke('#ecfdf5', '#d1fae5');
+          doc
+            .roundedRect(WM_X, WM_Y, WM_SIZE, WM_SIZE, 20)
+            .fillAndStroke('#ecfdf5', '#d1fae5');
           doc.font('Helvetica-Bold').fontSize(32).fillColor('#10b981');
           t('CGE', WM_X, WM_Y + 32, { width: WM_SIZE, align: 'center' });
           doc.opacity(1);
@@ -315,12 +475,20 @@ export class VouchersService {
         let yearText = '';
         if (voucher.distributionDate) {
           try {
-            const hijriFormatter = new Intl.DateTimeFormat('id-ID-u-ca-islamic', { year: 'numeric' });
-            const hijriParts = hijriFormatter.format(new Date(voucher.distributionDate)).split(' ');
+            const hijriFormatter = new Intl.DateTimeFormat(
+              'id-ID-u-ca-islamic',
+              { year: 'numeric' },
+            );
+            const hijriParts = hijriFormatter
+              .format(new Date(voucher.distributionDate))
+              .split(' ');
             const hijri = hijriParts[0] + ' H';
-            const masehi = new Date(voucher.distributionDate).getFullYear() + ' M';
+            const masehi =
+              new Date(voucher.distributionDate).getFullYear() + ' M';
             yearText = `Idul Adha ${hijri} / ${masehi}`;
-          } catch { yearText = `Idul Adha ${voucher.event?.year || ''}`; }
+          } catch {
+            yearText = `Idul Adha ${voucher.event?.year || ''}`;
+          }
         } else {
           yearText = `Idul Adha ${voucher.event?.year || ''}`;
         }
@@ -345,29 +513,48 @@ export class VouchersService {
 
         doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#6b7280');
         t('#  ID KUPON', L, BOX_Y_LABEL);
-        doc.roundedRect(L, BOX_Y, BOX1_W, BOX_H, 5).fillAndStroke('#f9fafb', '#e5e7eb');
+        doc
+          .roundedRect(L, BOX_Y, BOX1_W, BOX_H, 5)
+          .fillAndStroke('#f9fafb', '#e5e7eb');
         doc.font('Helvetica-Bold').fontSize(11).fillColor('#10b981');
-        t(voucher.voucherCode, L, BOX_Y + 9, { width: BOX1_W, align: 'center' });
+        t(voucher.voucherCode, L, BOX_Y + 9, {
+          width: BOX1_W,
+          align: 'center',
+        });
 
         // ─── TANGGAL section ───
         doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#6b7280');
         t('TANGGAL', BOX2_X, BOX_Y_LABEL);
-        doc.roundedRect(BOX2_X, BOX_Y, BOX2_W, BOX_H, 5).fillAndStroke('#f9fafb', '#e5e7eb');
+        doc
+          .roundedRect(BOX2_X, BOX_Y, BOX2_W, BOX_H, 5)
+          .fillAndStroke('#f9fafb', '#e5e7eb');
         const dateStr = voucher.distributionDate
-          ? new Date(voucher.distributionDate).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+          ? new Date(voucher.distributionDate).toLocaleDateString('id-ID', {
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+            })
           : '-';
         doc.font('Helvetica-Bold').fontSize(10).fillColor('#111827');
         t(dateStr, BOX2_X, BOX_Y + 10, { width: BOX2_W, align: 'center' });
 
         // ─── Footer info (bottom of left area) ───
         doc.font('Helvetica').fontSize(6.5).fillColor('#9ca3af');
-        t('ⓘ  Tunjukkan kupon ini saat pengambilan. Hanya panitia yang boleh memindai.', L, y + CARD_H - 18);
+        t(
+          'ⓘ  Tunjukkan kupon ini saat pengambilan. Hanya panitia yang boleh memindai.',
+          L,
+          y + CARD_H - 18,
+        );
 
         // ─── Dotted vertical separator ───
         doc.save();
-        doc.moveTo(SEP_X, y + 10)
+        doc
+          .moveTo(SEP_X, y + 10)
           .lineTo(SEP_X, y + CARD_H - 10)
-          .lineWidth(1).dash(3, { space: 3 }).stroke('#d1d5db');
+          .lineWidth(1)
+          .dash(3, { space: 3 })
+          .stroke('#d1d5db');
         doc.undash();
         doc.restore();
 
@@ -375,22 +562,33 @@ export class VouchersService {
         doc.roundedRect(R_X, y + 10, R_W, CARD_H - 20, 6).fill('#ecfdf5');
 
         const QR_SIZE = 92;
-        const qrTextH = 18;      // space for 2 lines of text below QR
-        const qrTotalH = QR_SIZE + 6 + qrTextH;  // QR + gap + text
-        const qrPanelH = CARD_H - 20;             // green panel height
+        const qrTextH = 18; // space for 2 lines of text below QR
+        const qrTotalH = QR_SIZE + 6 + qrTextH; // QR + gap + text
+        const qrPanelH = CARD_H - 20; // green panel height
         const qrOffsetY = (qrPanelH - qrTotalH) / 2; // center vertically
         const qrX = R_X + (R_W - QR_SIZE) / 2;
         const qrY = y + 10 + qrOffsetY;
 
         if (voucher.qrData && voucher.qrData.includes(',')) {
           try {
-            const qrBuffer = Buffer.from(voucher.qrData.split(',')[1], 'base64');
+            const qrBuffer = Buffer.from(
+              voucher.qrData.split(',')[1],
+              'base64',
+            );
             doc.image(qrBuffer, qrX, qrY, { width: QR_SIZE, height: QR_SIZE });
-          } catch (e) { /* skip */ }
+          } catch (e) {
+            /* skip */
+          }
         }
         doc.font('Helvetica-Bold').fontSize(5.5).fillColor('#10b981');
-        t('SCAN UNTUK VERIFIKASI', R_X, qrY + QR_SIZE + 6, { width: R_W, align: 'center' });
-        t('OLEH PANITIA', R_X, qrY + QR_SIZE + 14, { width: R_W, align: 'center' });
+        t('SCAN UNTUK VERIFIKASI', R_X, qrY + QR_SIZE + 6, {
+          width: R_W,
+          align: 'center',
+        });
+        t('OLEH PANITIA', R_X, qrY + QR_SIZE + 14, {
+          width: R_W,
+          align: 'center',
+        });
       }
 
       doc.end();
@@ -398,7 +596,9 @@ export class VouchersService {
   }
 
   private async generateUniqueCode(distributionDate: Date): Promise<string> {
-    const hijriFormatter = new Intl.DateTimeFormat('en-US-u-ca-islamic', { year: 'numeric' });
+    const hijriFormatter = new Intl.DateTimeFormat('en-US-u-ca-islamic', {
+      year: 'numeric',
+    });
     const hijriYearRaw = hijriFormatter.format(distributionDate);
     const hijriYear = hijriYearRaw.split(' ')[0];
 
@@ -409,10 +609,14 @@ export class VouchersService {
     while (!isUnique) {
       let randomPart = '';
       for (let i = 0; i < 10; i++) {
-        randomPart += characters.charAt(Math.floor(Math.random() * characters.length));
+        randomPart += characters.charAt(
+          Math.floor(Math.random() * characters.length),
+        );
       }
       code = `QRB-${hijriYear}H-${randomPart}`;
-      const existing = await this.vouchersRepository.findOne({ where: { voucherCode: code } });
+      const existing = await this.vouchersRepository.findOne({
+        where: { voucherCode: code },
+      });
       if (!existing) {
         isUnique = true;
       }
@@ -442,10 +646,13 @@ export class VouchersService {
     return { deleted: result.affected || 0 };
   }
 
-  async bulkUpdateDate(ids: string[], newDate: string): Promise<{ updated: number }> {
+  async bulkUpdateDate(
+    ids: string[],
+    newDate: string,
+  ): Promise<{ updated: number }> {
     // Validate date against each voucher's event
     const vouchers = await this.vouchersRepository.find({
-      where: ids.map(id => ({ id })),
+      where: ids.map((id) => ({ id })),
       relations: ['event'],
     });
     for (const voucher of vouchers) {
@@ -475,7 +682,10 @@ export class VouchersService {
     return this.vouchersRepository.save(voucher);
   }
 
-  private validateDistributionDate(distributionDate: string, event: Event): void {
+  private validateDistributionDate(
+    distributionDate: string,
+    event: Event,
+  ): void {
     if (!distributionDate) return;
     const dist = new Date(distributionDate);
     if (event.startDate) {
@@ -483,8 +693,14 @@ export class VouchersService {
       start.setHours(0, 0, 0, 0);
       dist.setHours(0, 0, 0, 0);
       if (dist < start) {
-        const s = start.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-        throw new BadRequestException(`Tanggal distribusi tidak boleh sebelum tanggal mulai event (${s})`);
+        const s = start.toLocaleDateString('id-ID', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        });
+        throw new BadRequestException(
+          `Tanggal distribusi tidak boleh sebelum tanggal mulai event (${s})`,
+        );
       }
     }
     if (event.endDate) {
@@ -492,8 +708,14 @@ export class VouchersService {
       end.setHours(23, 59, 59, 999);
       dist.setHours(0, 0, 0, 0);
       if (dist > end) {
-        const e = end.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-        throw new BadRequestException(`Tanggal distribusi tidak boleh setelah tanggal selesai event (${e})`);
+        const e = end.toLocaleDateString('id-ID', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        });
+        throw new BadRequestException(
+          `Tanggal distribusi tidak boleh setelah tanggal selesai event (${e})`,
+        );
       }
     }
   }
@@ -521,7 +743,12 @@ export class VouchersService {
       .andWhere('v.status = :status', { status: VoucherStatus.CANCELLED })
       .getCount();
 
-    return { total, claimed, active, cancelled };
+    const distributed = await qb
+      .clone()
+      .andWhere('v.status = :status', { status: VoucherStatus.DISTRIBUTED })
+      .getCount();
+
+    return { total, claimed, active, cancelled, distributed };
   }
 
   async getScanLogs(eventId?: string): Promise<ScanLog[]> {

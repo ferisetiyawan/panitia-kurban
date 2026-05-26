@@ -77,6 +77,19 @@ export class Pengkurban {
   @Column({ name: 'infaq_paid_at', type: 'timestamptz', nullable: true })
   infaqPaidAt: Date | null;
 
+  // Nominal infaq yang diharapkan dari pengkurban ini. NULL = waiver (di-skip
+  // dari rekap sumbangan — mis. infaq via potongan daging / institutional).
+  // Default di-set di service create() berdasarkan animal_type; admin bisa
+  // override atau set null untuk waiver.
+  @Column({
+    name: 'infaq_amount',
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    nullable: true,
+  })
+  infaqAmount: number | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

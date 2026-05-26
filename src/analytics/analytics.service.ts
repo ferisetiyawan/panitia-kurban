@@ -13,7 +13,11 @@ export class AnalyticsService {
     private visitRepo: Repository<PageVisit>,
   ) {}
 
-  async track(page: string, sessionId: string, referrer?: string): Promise<void> {
+  async track(
+    page: string,
+    sessionId: string,
+    referrer?: string,
+  ): Promise<void> {
     await this.visitRepo.save(
       this.visitRepo.create({ page, sessionId, referrer: referrer || null }),
     );
@@ -41,7 +45,12 @@ export class AnalyticsService {
       .groupBy("DATE_TRUNC('day', v.created_at)")
       .addGroupBy('v.page')
       .orderBy('date', 'ASC')
-      .getRawMany<{ date: string; page: string; total: string; unique: string }>();
+      .getRawMany<{
+        date: string;
+        page: string;
+        total: string;
+        unique: string;
+      }>();
 
     // Funnel: daftar sessions → registrations → proof uploaded → confirmed
     const daftarSessions = await this.visitRepo

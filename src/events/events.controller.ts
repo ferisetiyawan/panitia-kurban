@@ -46,8 +46,13 @@ export class EventsController {
 
   @Post(':id/logo')
   @Roles(Role.SUPER_ADMIN, Role.KETUA_PANITIA)
-  @UseInterceptors(FileInterceptor('logo', { limits: { fileSize: 5 * 1024 * 1024 } }))
-  uploadLogo(@Param('id') id: string, @UploadedFile() file: Express.Multer.File) {
+  @UseInterceptors(
+    FileInterceptor('logo', { limits: { fileSize: 5 * 1024 * 1024 } }),
+  )
+  uploadLogo(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
     return this.eventsService.uploadLogo(id, file);
   }
 

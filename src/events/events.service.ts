@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Event } from './event.entity';
@@ -29,7 +33,10 @@ export class EventsService {
   }
 
   async findActive(): Promise<Event | null> {
-    return this.eventsRepository.findOne({ where: { isActive: true }, order: { createdAt: 'DESC' } });
+    return this.eventsRepository.findOne({
+      where: { isActive: true },
+      order: { createdAt: 'DESC' },
+    });
   }
 
   async create(data: Partial<Event>): Promise<Event> {
@@ -67,7 +74,7 @@ export class EventsService {
       where: { eventId: id },
       select: ['id'],
     });
-    const voucherIds = vouchers.map(v => v.id);
+    const voucherIds = vouchers.map((v) => v.id);
 
     // Delete scan logs for all vouchers of this event
     if (voucherIds.length > 0) {
@@ -90,7 +97,9 @@ export class EventsService {
       const start = new Date(data.startDate);
       const end = new Date(data.endDate);
       if (start > end) {
-        throw new BadRequestException('Tanggal mulai harus sebelum tanggal selesai');
+        throw new BadRequestException(
+          'Tanggal mulai harus sebelum tanggal selesai',
+        );
       }
     }
   }

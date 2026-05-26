@@ -21,6 +21,7 @@ export interface PricingCatalog {
   sapiKolektif: {
     opsiA: SapiKolektifOption;
     opsiB: SapiKolektifOption;
+    opsiC: SapiKolektifOption;
     orangPerEkor: number;
     jenisSapi: string;
   };
@@ -47,22 +48,92 @@ const INFAQ_SAPI_PERORANGAN = 1_750_000;
 
 export const PRICING: PricingCatalog = {
   domba: [
-    { size: 'Tipe A', weight: '30 kg', price: 2_950_000, infaq: INFAQ_KAMBING_DOMBA },
-    { size: 'Tipe B', weight: '40 kg', price: 3_950_000, infaq: INFAQ_KAMBING_DOMBA },
-    { size: 'Tipe C', weight: '50 kg', price: 4_950_000, infaq: INFAQ_KAMBING_DOMBA },
-    { size: 'Super', weight: '60-90 kg', priceMin: 5_600_000, priceMax: 9_000_000, infaq: INFAQ_KAMBING_DOMBA },
-    { size: 'Istimewa', weight: '>100 kg', priceNote: 'hubungi panitia', infaq: INFAQ_KAMBING_DOMBA },
+    {
+      size: 'Tipe A',
+      weight: '30 kg',
+      price: 2_950_000,
+      infaq: INFAQ_KAMBING_DOMBA,
+    },
+    {
+      size: 'Tipe B',
+      weight: '40 kg',
+      price: 3_950_000,
+      infaq: INFAQ_KAMBING_DOMBA,
+    },
+    {
+      size: 'Tipe C',
+      weight: '50 kg',
+      price: 4_950_000,
+      infaq: INFAQ_KAMBING_DOMBA,
+    },
+    {
+      size: 'Super',
+      weight: '60-90 kg',
+      priceMin: 5_600_000,
+      priceMax: 9_000_000,
+      infaq: INFAQ_KAMBING_DOMBA,
+    },
+    {
+      size: 'Istimewa',
+      weight: '>100 kg',
+      priceNote: 'hubungi panitia',
+      infaq: INFAQ_KAMBING_DOMBA,
+    },
   ],
   kambing: [
-    { size: 'Tipe A', weight: '30 kg', price: 3_000_000, infaq: INFAQ_KAMBING_DOMBA },
-    { size: 'Tipe B', weight: '40 kg', price: 3_950_000, infaq: INFAQ_KAMBING_DOMBA },
-    { size: 'Tipe C', weight: '50 kg', price: 5_000_000, infaq: INFAQ_KAMBING_DOMBA },
-    { size: 'Super', weight: '60-90 kg', priceMin: 5_650_000, priceMax: 9_200_000, infaq: INFAQ_KAMBING_DOMBA },
-    { size: 'Istimewa', weight: '>100 kg', priceNote: 'hubungi panitia', infaq: INFAQ_KAMBING_DOMBA },
+    {
+      size: 'Tipe A',
+      weight: '30 kg',
+      price: 3_000_000,
+      infaq: INFAQ_KAMBING_DOMBA,
+    },
+    {
+      size: 'Tipe B',
+      weight: '40 kg',
+      price: 3_950_000,
+      infaq: INFAQ_KAMBING_DOMBA,
+    },
+    {
+      size: 'Tipe C',
+      weight: '50 kg',
+      price: 5_000_000,
+      infaq: INFAQ_KAMBING_DOMBA,
+    },
+    {
+      size: 'Super',
+      weight: '60-90 kg',
+      priceMin: 5_650_000,
+      priceMax: 9_200_000,
+      infaq: INFAQ_KAMBING_DOMBA,
+    },
+    {
+      size: 'Istimewa',
+      weight: '>100 kg',
+      priceNote: 'hubungi panitia',
+      infaq: INFAQ_KAMBING_DOMBA,
+    },
   ],
   sapiKolektif: {
-    opsiA: { perOrang: 4_000_000, beratSapi: '350-400 kg', label: 'Sapi A', infaq: INFAQ_SAPI_KOLEKTIF },
-    opsiB: { perOrang: 3_500_000, beratSapi: '320-350 kg', label: 'Sapi B', infaq: INFAQ_SAPI_KOLEKTIF },
+    opsiA: {
+      perOrang: 4_000_000,
+      beratSapi: '350-400 kg',
+      label: 'Sapi A',
+      infaq: INFAQ_SAPI_KOLEKTIF,
+    },
+    opsiB: {
+      perOrang: 3_500_000,
+      beratSapi: '320-350 kg',
+      label: 'Sapi B',
+      infaq: INFAQ_SAPI_KOLEKTIF,
+    },
+    // opsiC: spec identik dengan opsiB. Murni grouping label — di grup WA
+    // sapi kedua/ketiga di tier B di-sebut "Sapi C" (B-1, B-2 secara informal).
+    opsiC: {
+      perOrang: 3_500_000,
+      beratSapi: '320-350 kg',
+      label: 'Sapi C',
+      infaq: INFAQ_SAPI_KOLEKTIF,
+    },
     orangPerEkor: 7,
     jenisSapi: 'Sapi Bali',
   },

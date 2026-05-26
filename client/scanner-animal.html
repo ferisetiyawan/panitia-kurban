@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scanner Hewan - Panitia Kurban</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+</head>
+<body>
+  <div class="bg-orb bg-orb-1"></div>
+  <div class="bg-orb bg-orb-2"></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo"><h1>🕌 Al Hijrah CGE</h1><p>Sistem Panitia Kurban</p></div>
+    <nav class="sidebar-nav"></nav>
+  </aside>
+  <nav class="bottom-nav" id="bottom-nav"><div class="bottom-nav-items"></div></nav>
+
+  <main class="main-content">
+    <div class="top-bar">
+      <div class="flex items-center gap-3">
+        <button class="hamburger" onclick="toggleSidebar()">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+          </svg>
+        </button>
+        <h2 class="page-title">Scanner Penerimaan Hewan</h2>
+      </div>
+      <div id="user-info" class="user-info"></div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <!-- Scanner Column -->
+      <div>
+        <div class="card mb-4">
+          <h3 class="section-title mb-4">📷 Scan Kartu Hewan</h3>
+          <div id="qr-reader" style="border-radius:12px; overflow:hidden;"></div>
+          <div class="flex gap-2 mt-3">
+            <button id="btn-start" onclick="startScan()" class="btn-primary flex-1">Mulai Scan</button>
+            <button id="btn-stop" onclick="stopScan()" class="btn-secondary flex-1" style="display:none;">Stop</button>
+          </div>
+        </div>
+
+        <!-- Manual input -->
+        <div class="card">
+          <h3 class="section-title mb-3">⌨️ Input Manual</h3>
+          <div class="flex gap-2">
+            <input type="text" id="manual-code" class="input-field" placeholder="ANM-1447H-XXXXXXXX"
+              style="font-family:monospace; text-transform:uppercase;"
+              onkeydown="if(event.key==='Enter') lookupManual()">
+            <button onclick="lookupManual()" class="btn-primary" style="white-space:nowrap;">Cari</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Result Column -->
+      <div>
+        <div id="result-area">
+          <div class="card" style="text-align:center; padding:40px 20px;">
+            <div style="font-size:48px; margin-bottom:12px;">🐄</div>
+            <p style="color:#9ca3af;">Scan atau masukkan kode kartu hewan untuk melihat info dan mencatat penerimaan.</p>
+            <p style="color:#6b7280; font-size:12px; margin-top:8px;">Format kode: ANM-XXXXH-XXXXXXXX</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Photo upload modal -->
+  <div id="modal-photo" class="modal-overlay" style="display:none;">
+    <div class="modal-content">
+      <h3 class="modal-title">📷 Upload Foto Hewan</h3>
+      <div id="modal-photo-info" style="background:rgba(16,185,129,0.1); border-radius:8px; padding:12px; margin-bottom:16px; font-size:14px;"></div>
+      <div id="modal-photo-grid" class="grid grid-cols-3 gap-2 mb-4"></div>
+      <div class="form-group">
+        <label>Pilih Foto</label>
+        <input type="file" id="photo-file" accept="image/*" capture="environment" class="input-field">
+      </div>
+      <div class="modal-actions">
+        <button onclick="document.getElementById('modal-photo').style.display='none'" class="btn-secondary">Tutup</button>
+        <button onclick="doUploadPhoto()" class="btn-primary">Upload</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/app.js"></script>
+  <script>
+    let html5QrCode = null;
+    let currentAnimal = null;
+
+    const TYPE_LABELS = {
+      DOMBA: 'Domba 🐑', KAMBING: 'Kambing 🐐', SAPI: 'Sapi 🐄',
+      SAPI_KOLEKTIF: 'Sapi Kolektif 🐄', SAPI_KOLEKTIF_A: 'Sapi Kolektif A 🐄',
+      SAPI_KOLEKTIF_B: 'Sapi Kolektif B 🐄', SAPI_KOLEKTIF_C: 'Sapi Kolektif C 🐄',
+      SAPI_PERORANGAN: 'Sapi Perorangan 🐄',
+    };
+
+    function typeLabel(t) { return TYPE_LABELS[t] || t; }
+
+    async function startScan() {
+      if (html5QrCode) {
+        try { await html5QrCode.stop(); } catch {}
+      }
+      html5QrCode = new Html5Qrcode('qr-reader');
+      document.getElementById('btn-start').style.display = 'none';
+      document.getElementById('btn-stop').style.display = 'block';
+      try {
+        await html5QrCode.start(
+          { facingMode: 'environment' },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          onScanSuccess,
+          () => {}
+        );
+      } catch (err) {
+        document.getElementById('btn-start').style.display = 'block';
+        document.getElementById('btn-stop').style.display = 'none';
+        alert('Tidak bisa mengakses kamera: ' + err);
+      }
+    }
+
+    async function stopScan() {
+      if (html5QrCode) {
+        try { await html5QrCode.stop(); } catch {}
+        html5QrCode = null;
+      }
+      document.getElementById('btn-start').style.display = 'block';
+      document.getElementById('btn-stop').style.display = 'none';
+    }
+
+    async function onScanSuccess(decodedText) {
+      await stopScan();
+      await lookupCode(decodedText.trim());
+    }
+
+    async function lookupManual() {
+      const code = document.getElementById('manual-code').value.trim().toUpperCase();
+      if (!code) return;
+      await lookupCode(code);
+    }
+
+    async function lookupCode(code) {
+      showResult('<div style="text-align:center; padding:20px; color:#9ca3af;">Mencari...</div>');
+      try {
+        const animal = await api(`/animals/scan/${encodeURIComponent(code)}`);
+        currentAnimal = animal;
+        renderAnimalResult(animal);
+      } catch (e) {
+        showResult(`
+          <div class="card" style="border:1px solid rgba(239,68,68,0.3);">
+            <div style="text-align:center; padding:20px;">
+              <div style="font-size:40px; margin-bottom:12px;">❌</div>
+              <p style="color:#f87171; font-size:16px; font-weight:600;">Hewan tidak ditemukan</p>
+              <p style="color:#9ca3af; font-size:13px; margin-top:8px;">Kode: <code>${code}</code></p>
+            </div>
+          </div>`);
+      }
+    }
+
+    function renderAnimalResult(a) {
+      const names = (a.sohibulNames || []);
+      const isReceived = a.status === 'RECEIVED';
+      const photoCount = (a.photos || []).length;
+
+      const statusHtml = isReceived
+        ? `<span class="badge badge-confirmed">✅ Sudah Diterima</span>`
+        : `<span class="badge badge-pending">⏳ Belum Diterima</span>`;
+
+      const receivedInfo = isReceived && a.receivedAt
+        ? `<div style="margin-top:8px; font-size:12px; color:#6b7280;">
+            Diterima: ${new Date(a.receivedAt).toLocaleString('id-ID', {day:'numeric', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit'})}
+           </div>` : '';
+
+      const nameList = names.length
+        ? names.map((n, i) => `<div style="font-size:13px;">${i+1}. ${n}</div>`).join('')
+        : '<div style="color:#6b7280; font-size:13px;">Hewan vendor — tidak terdaftar</div>';
+
+      const receiveBtn = !isReceived
+        ? `<button onclick="doReceive()" class="btn-primary w-full mt-3">✅ Tandai Sudah Diterima</button>
+           <div class="form-group mt-2">
+             <input type="text" id="receive-notes" class="input-field" placeholder="Catatan kondisi hewan (opsional)">
+           </div>`
+        : '';
+
+      showResult(`
+        <div class="card" style="border:1px solid rgba(16,185,129,0.3);">
+          <div style="margin-bottom:12px;">
+            <div style="font-family:monospace; color:#10b981; font-size:14px; font-weight:700; margin-bottom:4px;">${a.animalCode}</div>
+            <div style="font-size:20px; font-weight:700; color:#f0fdf4; margin-bottom:6px;">${a.animalLabel || typeLabel(a.animalType)}</div>
+            ${statusHtml}
+            ${receivedInfo}
+          </div>
+          <div style="border-top:1px solid rgba(255,255,255,0.1); padding-top:12px; margin-bottom:12px;">
+            <div style="font-size:11px; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Sohibul Qurban</div>
+            ${nameList}
+          </div>
+          ${a.notes ? `<div style="background:rgba(255,255,255,0.05); border-radius:6px; padding:8px; font-size:12px; color:#9ca3af; margin-bottom:8px;">📝 ${a.notes}</div>` : ''}
+          ${receiveBtn}
+          <button onclick="showPhotoModal()" class="btn-secondary w-full mt-2">
+            📷 ${photoCount > 0 ? `Lihat & Tambah Foto (${photoCount})` : 'Upload Foto'}
+          </button>
+        </div>`);
+    }
+
+    async function doReceive() {
+      if (!currentAnimal) return;
+      const notes = document.getElementById('receive-notes')?.value || '';
+      try {
+        const result = await api(`/animals/${currentAnimal.id}/receive`, {
+          method: 'POST',
+          body: JSON.stringify({ notes })
+        });
+        currentAnimal = result;
+        renderAnimalResult(result);
+      } catch (e) { alert(e.message || 'Gagal mencatat penerimaan'); }
+    }
+
+    function showPhotoModal() {
+      if (!currentAnimal) return;
+      const a = currentAnimal;
+      document.getElementById('modal-photo-info').innerHTML =
+        `<strong>${a.animalLabel || typeLabel(a.animalType)}</strong> — <code style="color:#10b981; font-size:11px;">${a.animalCode}</code>`;
+      const grid = document.getElementById('modal-photo-grid');
+      const photos = a.photos || [];
+      grid.innerHTML = photos.length === 0
+        ? '<p style="color:#6b7280; font-size:13px;">Belum ada foto</p>'
+        : photos.map(f => `<img src="/api/uploads/animal-photos/${f}" style="width:100%; aspect-ratio:1; object-fit:cover; border-radius:8px;">`).join('');
+      document.getElementById('photo-file').value = '';
+      document.getElementById('modal-photo').style.display = 'flex';
+    }
+
+    async function doUploadPhoto() {
+      if (!currentAnimal) return;
+      const file = document.getElementById('photo-file').files[0];
+      if (!file) return alert('Pilih foto terlebih dahulu');
+      const form = new FormData();
+      form.append('photo', file);
+      const token = localStorage.getItem('token');
+      try {
+        const res = await fetch(`/api/animals/${currentAnimal.id}/photo`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: form,
+        });
+        if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+        const updated = await res.json();
+        currentAnimal = updated;
+        renderAnimalResult(updated);
+        // refresh photo grid
+        const photos = updated.photos || [];
+        document.getElementById('modal-photo-grid').innerHTML =
+          photos.map(f => `<img src="/api/uploads/animal-photos/${f}" style="width:100%; aspect-ratio:1; object-fit:cover; border-radius:8px;">`).join('');
+        document.getElementById('photo-file').value = '';
+      } catch (e) { alert(e.message || 'Gagal upload foto'); }
+    }
+
+    function showResult(html) {
+      document.getElementById('result-area').innerHTML = html;
+    }
+
+    document.getElementById('modal-photo').addEventListener('click', function(e) {
+      if (e.target === this) this.style.display = 'none';
+    });
+
+    async function init() {
+      await requireAuth();
+      initSidebar('animals');
+    }
+    init();
+  </script>
+</body>
+</html>

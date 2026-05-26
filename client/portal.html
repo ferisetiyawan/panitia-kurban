@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portal Sohibul Qurban - Masjid Al Hijrah CGE</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="bg-orb bg-orb-1"></div>
+  <div class="bg-orb bg-orb-2"></div>
+
+  <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px;">
+    <div style="width: 100%; max-width: 420px;">
+
+      <!-- Logo / Header -->
+      <div class="text-center" style="margin-bottom: 32px;">
+        <div style="font-size: 56px; margin-bottom: 12px;">🕌</div>
+        <h1 style="font-size: 22px; font-weight: 800; color: #f0fdf4; margin-bottom: 4px;">Portal Sohibul Qurban</h1>
+        <p style="color: #6ee7b7; font-size: 14px;">Masjid Al Hijrah CGE</p>
+      </div>
+
+      <!-- Step 1: Phone -->
+      <div class="card" style="padding: 32px;" id="step-phone">
+        <h2 style="font-size: 16px; font-weight: 700; color: #f0fdf4; margin-bottom: 8px;">Masuk dengan Nomor WhatsApp</h2>
+        <p style="color: #9ca3af; font-size: 13px; margin-bottom: 24px;">
+          Kami akan kirim kode 6 digit ke WhatsApp Anda untuk verifikasi.
+        </p>
+
+        <div class="form-group">
+          <label for="phone">Nomor WhatsApp</label>
+          <input
+            type="tel"
+            id="phone"
+            class="input-field"
+            placeholder="0812-3456-7890"
+            autocomplete="tel"
+            onkeydown="if(event.key==='Enter') requestOtp()"
+          >
+        </div>
+
+        <div id="error-msg" style="display:none; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); border-radius:8px; padding:10px 14px; color:#fca5a5; font-size:13px; margin-bottom:16px;"></div>
+
+        <button onclick="requestOtp()" id="btn-request" class="btn-primary" style="width: 100%; padding: 12px; font-size: 15px; font-weight: 700;">
+          Kirim Kode OTP →
+        </button>
+
+        <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.08); text-align: center;">
+          <p style="color: #9ca3af; font-size: 12px;">Belum mendaftar?</p>
+          <a href="/daftar.html" style="color: #10b981; font-size: 13px; font-weight: 600;">Daftar Qurban →</a>
+          <span style="color: #374151; margin: 0 8px;">·</span>
+          <a href="/status.html" style="color: #6ee7b7; font-size: 13px;">Cek Status</a>
+        </div>
+        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px dashed rgba(255,255,255,0.06); text-align: center;">
+          <a href="/login.html" style="color: #9ca3af; font-size: 12px; text-decoration: underline;">🔐 Login Panitia</a>
+        </div>
+      </div>
+
+      <!-- Step 2: OTP -->
+      <div class="card" style="padding: 32px; display:none;" id="step-otp">
+        <h2 style="font-size: 16px; font-weight: 700; color: #f0fdf4; margin-bottom: 8px;">Masukkan Kode OTP</h2>
+        <p style="color: #9ca3af; font-size: 13px; margin-bottom: 20px;">
+          Kode 6 digit dikirim ke WhatsApp <span id="otp-phone-label" style="color:#6ee7b7; font-weight:600;"></span>.
+        </p>
+
+        <div class="form-group">
+          <label for="otp-code">Kode OTP</label>
+          <input
+            type="text"
+            inputmode="numeric"
+            pattern="[0-9]*"
+            maxlength="6"
+            id="otp-code"
+            class="input-field"
+            placeholder="123456"
+            autocomplete="one-time-code"
+            style="letter-spacing: 8px; text-align: center; font-size: 20px; font-weight: 700;"
+            onkeydown="if(event.key==='Enter') verifyOtp()"
+            oninput="this.value = this.value.replace(/\D/g,''); if(this.value.length===6) verifyOtp();"
+          >
+        </div>
+
+        <div id="otp-error-msg" style="display:none; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); border-radius:8px; padding:10px 14px; color:#fca5a5; font-size:13px; margin-bottom:16px;"></div>
+
+        <button onclick="verifyOtp()" id="btn-verify" class="btn-primary" style="width: 100%; padding: 12px; font-size: 15px; font-weight: 700;">
+          Verifikasi →
+        </button>
+
+        <div style="margin-top: 16px; text-align:center;">
+          <button onclick="backToPhone()" style="background:none; border:none; color:#9ca3af; font-size:12px; text-decoration:underline; cursor:pointer;">
+            ← Ganti nomor / kirim ulang
+          </button>
+        </div>
+      </div>
+
+      <p style="text-align: center; color: #374151; font-size: 11px; margin-top: 20px;">
+        Sistem Manajemen Panitia Kurban — Idul Adha 1447 H
+      </p>
+    </div>
+  </div>
+
+  <script>
+    if (localStorage.getItem('portalToken')) {
+      window.location.href = '/portal-dashboard.html';
+    }
+
+    let pendingPhone = '';
+
+    async function requestOtp() {
+      const phone = document.getElementById('phone').value.trim();
+      if (!phone) {
+        showError('Nomor WhatsApp wajib diisi');
+        return;
+      }
+      const btn = document.getElementById('btn-request');
+      btn.textContent = 'Mengirim kode...';
+      btn.disabled = true;
+      hideError();
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 20000);
+      try {
+        const res = await fetch('/api/portal/auth/request-otp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone }),
+          signal: controller.signal,
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          showError(data.message || 'Gagal mengirim kode OTP');
+          return;
+        }
+        pendingPhone = phone;
+        document.getElementById('otp-phone-label').textContent = phone;
+        document.getElementById('step-phone').style.display = 'none';
+        document.getElementById('step-otp').style.display = 'block';
+        setTimeout(() => document.getElementById('otp-code').focus(), 100);
+      } catch (e) {
+        if (e.name === 'AbortError') {
+          showError('Server lambat merespon. Coba lagi.');
+        } else {
+          showError('Gagal terhubung ke server. Coba lagi.');
+        }
+      } finally {
+        clearTimeout(timeoutId);
+        btn.textContent = 'Kirim Kode OTP →';
+        btn.disabled = false;
+      }
+    }
+
+    async function verifyOtp() {
+      const code = document.getElementById('otp-code').value.trim();
+      if (code.length !== 6) {
+        showOtpError('Kode harus 6 digit');
+        return;
+      }
+      const btn = document.getElementById('btn-verify');
+      btn.textContent = 'Memverifikasi...';
+      btn.disabled = true;
+      hideOtpError();
+      try {
+        const res = await fetch('/api/portal/auth/verify-otp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: pendingPhone, code }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          showOtpError(data.message || 'Kode OTP salah');
+          return;
+        }
+        localStorage.setItem('portalToken', data.token);
+        localStorage.setItem('portalUser', JSON.stringify(data.pengkurban));
+        window.location.href = '/portal-dashboard.html';
+      } catch (e) {
+        showOtpError('Gagal terhubung ke server. Coba lagi.');
+      } finally {
+        btn.textContent = 'Verifikasi →';
+        btn.disabled = false;
+      }
+    }
+
+    function backToPhone() {
+      document.getElementById('step-otp').style.display = 'none';
+      document.getElementById('step-phone').style.display = 'block';
+      document.getElementById('otp-code').value = '';
+      hideOtpError();
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('error-msg');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+    function hideError() { document.getElementById('error-msg').style.display = 'none'; }
+    function showOtpError(msg) {
+      const el = document.getElementById('otp-error-msg');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+    function hideOtpError() { document.getElementById('otp-error-msg').style.display = 'none'; }
+  </script>
+</body>
+</html>

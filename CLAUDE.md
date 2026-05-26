@@ -68,7 +68,7 @@ Registrasi orang yang mau kurban. Flow: `PENDING_PAYMENT` → (upload bukti) →
 - **Soft delete** via `@DeleteDateColumn` — `deleted_at` di-set, row tetap di DB
 - **WA notifier** fire saat public register sukses
 
-Animal types: `DOMBA`, `KAMBING`, `SAPI_KOLEKTIF_A`, `SAPI_KOLEKTIF_B`, `SAPI_PERORANGAN` (legacy: `SAPI_KOLEKTIF`).
+Animal types: `DOMBA`, `KAMBING`, `SAPI_KOLEKTIF_A`, `SAPI_KOLEKTIF_B`, `SAPI_KOLEKTIF_C` (spec sama dengan B — informal grouping label dari grup WA), `SAPI_PERORANGAN` (legacy: `SAPI_KOLEKTIF`).
 Purchase types: `BELI_MASJID`, `BAWA_SENDIRI`.
 
 ### 5. Donations / Sumbangan (`src/donations`)

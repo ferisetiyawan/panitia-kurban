@@ -1,4 +1,8 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
@@ -31,7 +35,11 @@ export class UsersService {
     return this.usersRepository.findOne({ where: { resetToken: token } });
   }
 
-  async updateResetToken(id: string, token: string | null, expires: Date | null) {
+  async updateResetToken(
+    id: string,
+    token: string | null,
+    expires: Date | null,
+  ) {
     const user = await this.findById(id);
     if (user) {
       user.resetToken = token as any;
@@ -41,10 +49,14 @@ export class UsersService {
   }
 
   async create(dto: CreateUserDto): Promise<User> {
-    if (dto.role === 'SUPER_ADMIN' as any) {
-      const existingSuperAdmin = await this.usersRepository.findOne({ where: { role: 'SUPER_ADMIN' as any } });
+    if (dto.role === ('SUPER_ADMIN' as any)) {
+      const existingSuperAdmin = await this.usersRepository.findOne({
+        where: { role: 'SUPER_ADMIN' as any },
+      });
       if (existingSuperAdmin) {
-        throw new ConflictException('Tidak dapat membuat Super Admin baru. Hanya ada 1 Super Admin di sistem.');
+        throw new ConflictException(
+          'Tidak dapat membuat Super Admin baru. Hanya ada 1 Super Admin di sistem.',
+        );
       }
     }
     const existing = await this.findByUsername(dto.username);
@@ -80,7 +92,7 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException('User tidak ditemukan');
     }
-    if (user.role === 'SUPER_ADMIN' as any) {
+    if (user.role === ('SUPER_ADMIN' as any)) {
       throw new ConflictException('Super Admin tidak dapat dinonaktifkan.');
     }
     user.isActive = false;
@@ -97,13 +109,15 @@ export class UsersService {
   async hardRemove(id: string): Promise<void> {
     const user = await this.findById(id);
     if (!user) throw new NotFoundException('User tidak ditemukan');
-    if (user.role === 'SUPER_ADMIN' as any) {
+    if (user.role === ('SUPER_ADMIN' as any)) {
       throw new ConflictException('Super Admin tidak dapat dihapus.');
     }
     try {
       await this.usersRepository.remove(user);
     } catch (error) {
-      throw new ConflictException('User tidak dapat dihapus karena masih terkait dengan data lain (misal: riwayat scan/voucher).');
+      throw new ConflictException(
+        'User tidak dapat dihapus karena masih terkait dengan data lain (misal: riwayat scan/voucher).',
+      );
     }
   }
 
