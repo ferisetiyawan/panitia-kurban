@@ -153,17 +153,24 @@ export interface Permintaan {
   catatanSebagian: string;
   catatanPanitia: string;
   name?: string;
+  /** 'hadir' = akan datang; 'tidak_hadir' = minta foto/video; null = belum isi form */
+  kehadiran?: 'hadir' | 'tidak_hadir' | null;
 }
 
 export function extractPermintaan(
   data: Record<string, string> | null | undefined,
 ): Permintaan {
   const d = data ?? {};
+  const kehadiranRaw = findByPrefix(d, 'Kehadiran saat penyembelihan').trim();
+  let kehadiran: 'hadir' | 'tidak_hadir' | null = null;
+  if (/hadir langsung/i.test(kehadiranRaw)) kehadiran = 'hadir';
+  else if (/tidak bisa hadir/i.test(kehadiranRaw)) kehadiran = 'tidak_hadir';
   return {
     hak: findByPrefix(d, 'Hak daging qurban').trim(),
     permintaanKhusus: findByPrefix(d, 'Permintaan khusus').trim(),
     catatanSebagian: findByPrefix(d, 'Catatan pengambilan').trim(),
     catatanPanitia: findByPrefix(d, 'Catatan Khusus untuk Panitia').trim(),
+    kehadiran,
   };
 }
 

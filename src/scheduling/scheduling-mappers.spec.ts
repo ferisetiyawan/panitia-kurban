@@ -138,6 +138,7 @@ describe('extractPermintaan', () => {
       permintaanKhusus: 'Kaki, Ekor',
       catatanSebagian: 'Paha kanan 4kg',
       catatanPanitia: 'Tolong bagian has dalam',
+      kehadiran: null,
     });
   });
 
@@ -147,6 +148,7 @@ describe('extractPermintaan', () => {
       permintaanKhusus: '',
       catatanSebagian: '',
       catatanPanitia: '',
+      kehadiran: null,
     });
   });
 
@@ -156,7 +158,18 @@ describe('extractPermintaan', () => {
       permintaanKhusus: '',
       catatanSebagian: '',
       catatanPanitia: '',
+      kehadiran: null,
     });
+  });
+
+  it('extracts kehadiran=hadir from "Saya akan hadir langsung"', () => {
+    const data = { 'Kehadiran saat penyembelihan': 'Saya akan hadir langsung' };
+    expect(extractPermintaan(data).kehadiran).toBe('hadir');
+  });
+
+  it('extracts kehadiran=tidak_hadir from "Saya tidak bisa hadir..."', () => {
+    const data = { 'Kehadiran saat penyembelihan': 'Saya tidak bisa hadir — mohon dikirimkan video & foto' };
+    expect(extractPermintaan(data).kehadiran).toBe('tidak_hadir');
   });
 
   it('trims whitespace', () => {
