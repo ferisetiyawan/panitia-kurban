@@ -56,7 +56,7 @@ export class SchedulingBroadcastService {
       lines.push('');
     }
 
-    lines.push('📍 Halaman Masjid Al Hijrah CGE');
+    lines.push('📍 Margata 8');
     lines.push('⏰ Mohon hadir min. 15 menit sebelum slot Anda');
     lines.push('🔗 Detail di portal: https://kurban.masjidalhijrahcge.id/portal.html');
     lines.push('');
