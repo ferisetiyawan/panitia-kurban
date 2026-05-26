@@ -339,7 +339,8 @@ export class SchedulingService {
       })));
     const current = await enrich(all.filter((a) => a.slaughterStatus === 'IN_PROGRESS'));
     const waiting = all.filter((a) => a.slaughterStatus === 'WAITING');
-    const next = await enrich(waiting.slice(0, 3));
+    // Show top 10 WAITING (urutan field bisa beda dari jadwal — panitia bisa Mulai mana saja)
+    const next = await enrich(waiting.slice(0, 10));
     const recent = await enrich(
       all.filter((a) => a.slaughterStatus === 'DONE' || a.slaughterStatus === 'SKIPPED')
         .sort((a, b) => (b.slaughterDoneAt?.getTime() ?? 0) - (a.slaughterDoneAt?.getTime() ?? 0))
