@@ -5,6 +5,17 @@ function fmtTime(d: Date): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+const KOLEKTIF_TYPES = ['SAPI_KOLEKTIF_A', 'SAPI_KOLEKTIF_B', 'SAPI_KOLEKTIF_C'];
+const ANIMAL_LABELS: Record<string, string> = {
+  SAPI_KOLEKTIF_A: 'Sapi Kolektif A',
+  SAPI_KOLEKTIF_B: 'Sapi Kolektif B',
+  SAPI_KOLEKTIF_C: 'Sapi Kolektif C',
+  SAPI_KOLEKTIF: 'Sapi Kolektif',
+  SAPI_PERORANGAN: 'Sapi',
+  KAMBING: 'Kambing',
+  DOMBA: 'Domba',
+};
+
 export type BroadcastTarget = 'sohibul_group' | 'panitia_group';
 
 @Injectable()
@@ -29,9 +40,16 @@ export class SchedulingBroadcastService {
         if (!it.animal.scheduledAt) continue;
         const time = fmtTime(new Date(it.animal.scheduledAt));
         const names = it.pengkurban.map((pk: any) => pk.name).filter(Boolean);
-        let line = `${time} — ${names[0] ?? '(tanpa sohibul)'}`;
-        if (names.length > 1) {
-          line += ` (kolektif: ${names.join(', ')})`;
+        const isKolektif = KOLEKTIF_TYPES.includes(it.animal.animalType);
+        let line: string;
+        if (isKolektif) {
+          const animalLabel = ANIMAL_LABELS[it.animal.animalType] || it.animal.animalType;
+          line =
+            names.length > 0
+              ? `${time} — ${animalLabel} (${names.join(', ')})`
+              : `${time} — ${animalLabel}`;
+        } else {
+          line = `${time} — ${names[0] ?? '(tanpa sohibul)'}`;
         }
         lines.push(line);
       }

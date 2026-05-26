@@ -54,7 +54,7 @@ describe('SchedulingBroadcastService', () => {
     );
     const msg = await service.buildSohibulMessage('event-1');
     expect(msg).toMatch(/Asep.*Margono.*Sylvie/);
-    expect(msg).toContain('kolektif:');
+    expect(msg).toContain('Sapi Kolektif A');
   });
 
   it('panitia message includes generatedBy + warnings when overflow/mismatches > 0', async () => {
