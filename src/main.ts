@@ -6,6 +6,7 @@ import * as express from 'express';
 import { join } from 'path';
 
 async function bootstrap() {
+  process.env.TZ = 'Asia/Jakarta';
   const app = await NestFactory.create(AppModule);
 
   app.useGlobalPipes(

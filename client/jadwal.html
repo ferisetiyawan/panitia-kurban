@@ -196,9 +196,27 @@
         }
       };
 
-      $('#btnPdf').onclick = () => {
+      $('#btnPdf').onclick = async () => {
         if (!currentEventId) return;
-        window.open(`/api/scheduling/pdf?eventId=${encodeURIComponent(currentEventId)}`, '_blank');
+        try {
+          const token = localStorage.getItem('token');
+          const res = await fetch(`/api/scheduling/pdf?eventId=${encodeURIComponent(currentEventId)}`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+          });
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.message || `HTTP ${res.status}`);
+          }
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `jadwal-${currentEventId.slice(0,8)}.pdf`;
+          a.click();
+          URL.revokeObjectURL(url);
+        } catch (e) {
+          alert('Gagal download PDF: ' + (e.message || e));
+        }
       };
 
       $('#btnBroadcast').onclick = (e) => {

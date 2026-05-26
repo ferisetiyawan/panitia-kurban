@@ -32,8 +32,27 @@ export class SchedulingPortalController {
     const phone: string | undefined = req.user?.phone;
     if (!phone) return [];
 
-    // 1. Find all pengkurban with this phone (could be multiple registrations)
-    const pengkurban = await this.pengkurbanRepo.find({ where: { phone } });
+    // 1. Find all pengkurban with this phone (could be multiple registrations).
+    // Match both local (08xxx) and international (628xxx) phone forms.
+    // Mirror logic from portal.service.ts findAllPengkurbanByPhone.
+    const digits = phone.replace(/\D/g, '');
+    let form1: string;
+    let form2: string;
+    if (digits.startsWith('62')) {
+      form1 = '0' + digits.slice(2);
+      form2 = digits;
+    } else if (digits.startsWith('0')) {
+      form1 = digits;
+      form2 = '62' + digits.slice(1);
+    } else {
+      // Unknown form — query as-is
+      form1 = digits;
+      form2 = digits;
+    }
+    const pengkurban = await this.pengkurbanRepo
+      .createQueryBuilder('p')
+      .where('p.phone = :form1 OR p.phone = :form2', { form1, form2 })
+      .getMany();
     if (pengkurban.length === 0) return [];
 
     const pkIds = pengkurban.map((p) => p.id);
