@@ -10,6 +10,7 @@ import {
   UseGuards,
   BadRequestException,
   ServiceUnavailableException,
+  Res,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -18,6 +19,8 @@ import { Role } from '../common/enums/role.enum';
 import { SchedulingService } from './scheduling.service';
 import type { Team } from './scheduling.service';
 import { SchedulingBroadcastService, BroadcastTarget } from './scheduling-broadcast.service';
+import type { Response } from 'express';
+import { SchedulingPdfService } from './scheduling-pdf.service';
 
 @Controller('api/scheduling')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -25,6 +28,7 @@ export class SchedulingController {
   constructor(
     private readonly service: SchedulingService,
     private readonly broadcast: SchedulingBroadcastService,
+    private readonly pdf: SchedulingPdfService,
   ) {}
 
   @Get()
@@ -87,5 +91,15 @@ export class SchedulingController {
     }
     await this.broadcast.sendToGroup(jid, message);
     return { sent: true, group_jid: jid };
+  }
+
+  @Get('pdf')
+  @Roles(Role.SUPER_ADMIN, Role.KETUA_PANITIA, Role.PANITIA_VOUCHER)
+  async exportPdf(@Query('eventId') eventId: string, @Res() res: Response) {
+    if (!eventId) throw new BadRequestException('eventId required');
+    const buf = await this.pdf.generate(eventId);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="jadwal-${eventId.slice(0, 8)}.pdf"`);
+    res.end(buf);
   }
 }
