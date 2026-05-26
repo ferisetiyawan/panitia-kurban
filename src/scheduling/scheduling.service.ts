@@ -319,17 +319,28 @@ export class SchedulingService {
   }
 
   /**
-   * Get ops data for one team: current (IN_PROGRESS), next 3 (WAITING), recent 5 (DONE).
+   * Get ops data: current (IN_PROGRESS), next top 10 (WAITING), recent 5 (DONE/SKIPPED).
+   *
+   * If `team` provided → filter to that team (legacy behavior).
+   * If `team` omitted → unified across both teams (dashboard mode).
+   *
+   * Always returns per-team breakdown (`*ByTeam`) so frontend can render counts
+   * tanpa second query.
    */
-  async getOpsData(eventId: string, team: Team): Promise<{
+  async getOpsData(eventId: string, team?: Team): Promise<{
     current: AnimalWithSohibul[];
     next: AnimalWithSohibul[];
     recent: AnimalWithSohibul[];
     waitingCount: number;
     doneCount: number;
+    waitingByTeam: { SAPI: number; KAMBING_DOMBA: number };
+    doneByTeam: { SAPI: number; KAMBING_DOMBA: number };
+    currentByTeam: { SAPI: number; KAMBING_DOMBA: number };
   }> {
+    const where: any = { eventId };
+    if (team) where.scheduledTeam = team as any;
     const all = await this.animalRepo.find({
-      where: { eventId, scheduledTeam: team as any },
+      where,
       order: { scheduledAt: 'ASC' },
     });
     const enrich = async (animals: Animal[]) =>
@@ -346,12 +357,23 @@ export class SchedulingService {
         .sort((a, b) => (b.slaughterDoneAt?.getTime() ?? 0) - (a.slaughterDoneAt?.getTime() ?? 0))
         .slice(0, 5),
     );
+
+    const byTeam = (status: string) => ({
+      SAPI: all.filter((a) => a.slaughterStatus === status && a.scheduledTeam === 'SAPI').length,
+      KAMBING_DOMBA: all.filter(
+        (a) => a.slaughterStatus === status && a.scheduledTeam === 'KAMBING_DOMBA',
+      ).length,
+    });
+
     return {
       current,
       next,
       recent,
       waitingCount: waiting.length,
       doneCount: all.filter((a) => a.slaughterStatus === 'DONE').length,
+      waitingByTeam: byTeam('WAITING'),
+      doneByTeam: byTeam('DONE'),
+      currentByTeam: byTeam('IN_PROGRESS'),
     };
   }
 
