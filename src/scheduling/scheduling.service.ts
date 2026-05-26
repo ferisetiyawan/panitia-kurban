@@ -127,6 +127,12 @@ export class SchedulingService {
    */
   async loadEligibleAnimals(eventId: string): Promise<EligibleAnimal[]> {
     const formKey = process.env.KONFIRMASI_TEKNIS_FORM_KEY;
+    const excludeRegs = new Set(
+      (process.env.SCHEDULING_EXCLUDE_REGS || '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+    );
     const animals = await this.animalRepo.find({ where: { eventId } });
 
     const result: EligibleAnimal[] = [];
@@ -138,6 +144,7 @@ export class SchedulingService {
       if (animal.pengkurbanId) {
         const pk = await this.pengkurbanRepo.findOne({ where: { id: animal.pengkurbanId } });
         if (!pk || !['CONFIRMED', 'PENDING_VERIFICATION'].includes(pk.status)) continue;
+        if (excludeRegs.has(pk.registrationNumber)) continue;
         const preferensi = await this.preferensiForPengkurban(pk.id, formKey);
         result.push({ animal, preferensi });
       } else if (KOLEKTIF_TYPES.includes(animal.animalType)) {
@@ -148,9 +155,12 @@ export class SchedulingService {
             status: In(['CONFIRMED', 'PENDING_VERIFICATION']) as any,
           },
         });
-        if (eligible.length === 0) continue;
+        const eligibleNotExcluded = eligible.filter(
+          (pk) => !excludeRegs.has(pk.registrationNumber),
+        );
+        if (eligibleNotExcluded.length === 0) continue;
         const prefs = await Promise.all(
-          eligible.map((pk) => this.preferensiForPengkurban(pk.id, formKey)),
+          eligibleNotExcluded.map((pk) => this.preferensiForPengkurban(pk.id, formKey)),
         );
         const valid = prefs.filter((p): p is PreferensiTime => !!p);
         const earliest = valid.length
@@ -215,9 +225,12 @@ export class SchedulingService {
   ): Promise<PreferensiTime | null> {
     if (!formKey) return null;
     const fr = await this.formRepo.findOne({ where: { pengkurbanId, formKey } });
-    if (!fr) return null;
-    const value = fr.data?.['Preferensi waktu penyembelihan'];
-    return parsePreferensiTime(value);
+    if (!fr || !fr.data) return null;
+    // Prefix-match in case form admin renames or adds newlines to the column header
+    const entry = Object.entries(fr.data).find(([k]) =>
+      k.startsWith('Preferensi waktu penyembelihan'),
+    );
+    return parsePreferensiTime(entry ? entry[1] : null);
   }
 
   /**
@@ -303,6 +316,161 @@ export class SchedulingService {
     }
 
     return summary;
+  }
+
+  /**
+   * Get ops data for one team: current (IN_PROGRESS), next 3 (WAITING), recent 5 (DONE).
+   */
+  async getOpsData(eventId: string, team: Team): Promise<{
+    current: AnimalWithSohibul[];
+    next: AnimalWithSohibul[];
+    recent: AnimalWithSohibul[];
+    waitingCount: number;
+    doneCount: number;
+  }> {
+    const all = await this.animalRepo.find({
+      where: { eventId, scheduledTeam: team as any },
+      order: { scheduledAt: 'ASC' },
+    });
+    const enrich = async (animals: Animal[]) =>
+      Promise.all(animals.map(async (animal) => ({
+        animal,
+        pengkurban: await this.sohibulOf(animal),
+      })));
+    const current = await enrich(all.filter((a) => a.slaughterStatus === 'IN_PROGRESS'));
+    const waiting = all.filter((a) => a.slaughterStatus === 'WAITING');
+    const next = await enrich(waiting.slice(0, 3));
+    const recent = await enrich(
+      all.filter((a) => a.slaughterStatus === 'DONE' || a.slaughterStatus === 'SKIPPED')
+        .sort((a, b) => (b.slaughterDoneAt?.getTime() ?? 0) - (a.slaughterDoneAt?.getTime() ?? 0))
+        .slice(0, 5),
+    );
+    return {
+      current,
+      next,
+      recent,
+      waitingCount: waiting.length,
+      doneCount: all.filter((a) => a.slaughterStatus === 'DONE').length,
+    };
+  }
+
+  /**
+   * Transition: WAITING → IN_PROGRESS. Returns nextWaitingAnimalId for JIT WA hook.
+   */
+  async startAnimal(animalId: string): Promise<{ animal: Animal; nextWaitingId: string | null }> {
+    const animal = await this.animalRepo.findOne({ where: { id: animalId } });
+    if (!animal) throw new NotFoundException(`Animal ${animalId} not found`);
+    await this.animalRepo.update(animalId, {
+      slaughterStatus: 'IN_PROGRESS' as any,
+      slaughterStartedAt: new Date(),
+    } as any);
+    let nextWaitingId: string | null = null;
+    if (animal.scheduledTeam) {
+      const next = await this.animalRepo.findOne({
+        where: {
+          eventId: animal.eventId,
+          scheduledTeam: animal.scheduledTeam as any,
+          slaughterStatus: 'WAITING' as any,
+        },
+        order: { scheduledAt: 'ASC' },
+      });
+      nextWaitingId = next?.id ?? null;
+    }
+    const updated = await this.animalRepo.findOne({ where: { id: animalId } });
+    return { animal: updated!, nextWaitingId };
+  }
+
+  /**
+   * Transition: → DONE.
+   */
+  async doneAnimal(animalId: string): Promise<Animal> {
+    const animal = await this.animalRepo.findOne({ where: { id: animalId } });
+    if (!animal) throw new NotFoundException(`Animal ${animalId} not found`);
+    await this.animalRepo.update(animalId, {
+      slaughterStatus: 'DONE' as any,
+      slaughterDoneAt: new Date(),
+    } as any);
+    return (await this.animalRepo.findOne({ where: { id: animalId } }))!;
+  }
+
+  /**
+   * Transition: → SKIPPED (manual override, treated like done but flagged).
+   */
+  async skipAnimal(animalId: string): Promise<Animal> {
+    const animal = await this.animalRepo.findOne({ where: { id: animalId } });
+    if (!animal) throw new NotFoundException(`Animal ${animalId} not found`);
+    await this.animalRepo.update(animalId, {
+      slaughterStatus: 'SKIPPED' as any,
+      slaughterDoneAt: new Date(),
+    } as any);
+    return (await this.animalRepo.findOne({ where: { id: animalId } }))!;
+  }
+
+  /**
+   * Reset slaughter status to WAITING (e.g. accidental mark-done revert).
+   */
+  async resetAnimalStatus(animalId: string): Promise<Animal> {
+    await this.animalRepo.update(animalId, {
+      slaughterStatus: 'WAITING' as any,
+      slaughterStartedAt: null,
+      slaughterDoneAt: null,
+    } as any);
+    return (await this.animalRepo.findOne({ where: { id: animalId } }))!;
+  }
+
+  /** Public so controller can fetch by id. */
+  async findAnimal(animalId: string): Promise<Animal | null> {
+    return this.animalRepo.findOne({ where: { id: animalId } });
+  }
+
+  /**
+   * Find sohibul phones for an animal that have hadir=true (JIT recipient).
+   * Reads form data for kehadiran field.
+   */
+  async hadirSohibulPhones(animal: Animal): Promise<Array<{ name: string; phone: string }>> {
+    const pks = await this.sohibulOf(animal);
+    const formKey = process.env.KONFIRMASI_TEKNIS_FORM_KEY;
+    const result: Array<{ name: string; phone: string }> = [];
+    for (const pk of pks) {
+      if (!pk.phone) continue;
+      if (!formKey) {
+        result.push({ name: pk.name, phone: pk.phone });
+        continue;
+      }
+      const fr = await this.formRepo.findOne({ where: { pengkurbanId: pk.id, formKey } });
+      if (!fr || !fr.data) continue;
+      const kehadiranEntry = Object.entries(fr.data).find(([k]) =>
+        k.startsWith('Kehadiran saat penyembelihan'),
+      );
+      const kehadiran = kehadiranEntry ? String(kehadiranEntry[1]) : '';
+      if (/hadir langsung/i.test(kehadiran)) {
+        result.push({ name: pk.name, phone: pk.phone });
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Find sohibul phones for an animal that have hadir=false (auto-broadcast foto target).
+   */
+  async tidakHadirSohibulPhones(animal: Animal): Promise<Array<{ name: string; phone: string }>> {
+    const pks = await this.sohibulOf(animal);
+    const formKey = process.env.KONFIRMASI_TEKNIS_FORM_KEY;
+    const result: Array<{ name: string; phone: string }> = [];
+    for (const pk of pks) {
+      if (!pk.phone) continue;
+      if (!formKey) continue;
+      const fr = await this.formRepo.findOne({ where: { pengkurbanId: pk.id, formKey } });
+      if (!fr || !fr.data) continue;
+      const kehadiranEntry = Object.entries(fr.data).find(([k]) =>
+        k.startsWith('Kehadiran saat penyembelihan'),
+      );
+      const kehadiran = kehadiranEntry ? String(kehadiranEntry[1]) : '';
+      if (/tidak bisa hadir/i.test(kehadiran)) {
+        result.push({ name: pk.name, phone: pk.phone });
+      }
+    }
+    return result;
   }
 
   private async firstSohibulName(animal: Animal): Promise<string> {

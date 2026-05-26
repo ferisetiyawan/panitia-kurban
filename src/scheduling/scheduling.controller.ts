@@ -33,6 +33,10 @@ export class SchedulingController {
     private readonly sesetPdf: SchedulingSesetPdfService,
   ) {}
 
+  private animalLabel(animal: any): string {
+    return `${animal.animalCode} (${animal.animalType})`;
+  }
+
   @Get()
   @Roles(Role.SUPER_ADMIN, Role.KETUA_PANITIA, Role.PANITIA_VOUCHER, Role.PANITIA_SCANNER)
   async list(@Query('eventId') eventId: string, @Query('team') team?: Team) {
@@ -120,5 +124,77 @@ export class SchedulingController {
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="seset-${eventId.slice(0, 8)}.pdf"`);
     res.end(buf);
+  }
+
+  @Get('ops')
+  @Roles(Role.SUPER_ADMIN, Role.KETUA_PANITIA, Role.PANITIA_VOUCHER, Role.PANITIA_SCANNER)
+  async ops(@Query('eventId') eventId: string, @Query('team') team: Team) {
+    if (!eventId || !team) throw new BadRequestException('eventId + team required');
+    return this.service.getOpsData(eventId, team);
+  }
+
+  @Post(':animalId/start')
+  @Roles(Role.SUPER_ADMIN, Role.KETUA_PANITIA, Role.PANITIA_SCANNER)
+  async startSlaughter(@Param('animalId') animalId: string) {
+    const { animal, nextWaitingId } = await this.service.startAnimal(animalId);
+    if (nextWaitingId) {
+      try {
+        const nextAnimal = await this.service.findAnimal(nextWaitingId);
+        if (nextAnimal) {
+          const sohibul = await this.service.hadirSohibulPhones(nextAnimal);
+          this.broadcast.sendJitReminder(sohibul, this.animalLabel(nextAnimal))
+            .then((r) => {
+              if (r.failed.length > 0) {
+                console.error('[ops start jit]', r.failed.join('; '));
+              }
+            })
+            .catch((e: any) => {
+              console.error('[ops start jit]', e.stack || e.message);
+            });
+        }
+      } catch (e: any) {
+        console.error('[ops start jit prep]', e.stack || e.message);
+      }
+    }
+    return { animal, jitTriggered: !!nextWaitingId };
+  }
+
+  @Post(':animalId/done')
+  @Roles(Role.SUPER_ADMIN, Role.KETUA_PANITIA, Role.PANITIA_SCANNER)
+  async doneSlaughter(@Param('animalId') animalId: string) {
+    const animal = await this.service.doneAnimal(animalId);
+    return { animal };
+  }
+
+  @Post(':animalId/skip')
+  @Roles(Role.SUPER_ADMIN, Role.KETUA_PANITIA, Role.PANITIA_SCANNER)
+  async skipSlaughter(@Param('animalId') animalId: string) {
+    const animal = await this.service.skipAnimal(animalId);
+    return { animal };
+  }
+
+  @Post(':animalId/reset')
+  @Roles(Role.SUPER_ADMIN, Role.KETUA_PANITIA)
+  async resetSlaughter(@Param('animalId') animalId: string) {
+    const animal = await this.service.resetAnimalStatus(animalId);
+    return { animal };
+  }
+
+  @Post(':animalId/broadcast-foto')
+  @Roles(Role.SUPER_ADMIN, Role.KETUA_PANITIA, Role.PANITIA_SCANNER)
+  async broadcastFoto(@Param('animalId') animalId: string) {
+    const animal = await this.service.findAnimal(animalId);
+    if (!animal) throw new BadRequestException('animal not found');
+    const sohibul = await this.service.tidakHadirSohibulPhones(animal);
+    const photos: string[] = Array.isArray(animal.photos) ? animal.photos : [];
+    const photoUrls = photos.map(
+      (p) => `https://kurban.masjidalhijrahcge.id/api/uploads/animal-photos/${p}`,
+    );
+    const result = await this.broadcast.sendFotoBroadcast(
+      sohibul,
+      this.animalLabel(animal),
+      photoUrls,
+    );
+    return { animal, recipients: sohibul.length, ...result };
   }
 }

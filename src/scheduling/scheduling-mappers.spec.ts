@@ -163,6 +163,21 @@ describe('extractPermintaan', () => {
     const data = { 'Hak daging qurban untuk Sohibul Qurban': '   Paha kanan   ' };
     expect(extractPermintaan(data).hak).toBe('Paha kanan');
   });
+
+  it('extracts hak when key has trailing newline + clarification (real form)', () => {
+    const data = {
+      'Hak daging qurban untuk Sohibul Qurban\nApakah anda akan mengambil hak daging anda?':
+        'Ambil Hak Paha Kanan untuk hewan qurban perorangan',
+    };
+    expect(extractPermintaan(data).hak).toBe('Ambil Hak Paha Kanan untuk hewan qurban perorangan');
+  });
+
+  it('extracts permintaanKhusus by prefix even if key has suffix', () => {
+    const data = {
+      'Permintaan khusus untuk bagian tertentu untuk Sohibul Qurban': 'Kaki, Ekor',
+    };
+    expect(extractPermintaan(data).permintaanKhusus).toBe('Kaki, Ekor');
+  });
 });
 
 describe('summarizePermintaan', () => {

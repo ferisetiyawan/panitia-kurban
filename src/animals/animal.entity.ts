@@ -62,6 +62,15 @@ export class Animal {
   @Column({ name: 'scheduled_note', type: 'text', nullable: true })
   scheduledNote: string | null;
 
+  @Column({ name: 'slaughter_status', type: 'varchar', length: 20, nullable: true })
+  slaughterStatus: 'WAITING' | 'IN_PROGRESS' | 'DONE' | 'SKIPPED' | null;
+
+  @Column({ name: 'slaughter_started_at', type: 'timestamptz', nullable: true })
+  slaughterStartedAt: Date | null;
+
+  @Column({ name: 'slaughter_done_at', type: 'timestamptz', nullable: true })
+  slaughterDoneAt: Date | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
