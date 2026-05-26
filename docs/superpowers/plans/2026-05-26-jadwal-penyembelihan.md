@@ -1606,6 +1606,545 @@ git commit -m "feat(scheduling): PDF export"
 
 ---
 
+## Backend: Permintaan Daging (cheat sheet seset)
+
+### Task 16a: extractPermintaan mapper (TDD)
+
+**Files:**
+- Modify: `src/scheduling/scheduling-mappers.ts`
+- Modify: `src/scheduling/scheduling-mappers.spec.ts`
+
+- [ ] **Step 1: Write failing tests**
+
+Append to `scheduling-mappers.spec.ts`:
+
+```typescript
+import { extractPermintaan, summarizePermintaan } from './scheduling-mappers';
+
+describe('extractPermintaan', () => {
+  it('extracts all 4 fields from full form data', () => {
+    const data = {
+      'Hak daging qurban untuk Sohibul Qurban': 'Ambil Hak Paha Kanan untuk hewan qurban perorangan',
+      'Permintaan khusus untuk bagian tertentu untuk Sohibul Qurban': 'Kaki, Ekor',
+      'Catatan pengambilan hak sebagian': 'Paha kanan 4kg',
+      'Catatan Khusus untuk Panitia': 'Tolong bagian has dalam',
+    };
+    expect(extractPermintaan(data)).toEqual({
+      hak: 'Ambil Hak Paha Kanan untuk hewan qurban perorangan',
+      permintaanKhusus: 'Kaki, Ekor',
+      catatanSebagian: 'Paha kanan 4kg',
+      catatanPanitia: 'Tolong bagian has dalam',
+    });
+  });
+
+  it('returns empty strings for missing fields', () => {
+    expect(extractPermintaan({})).toEqual({
+      hak: '',
+      permintaanKhusus: '',
+      catatanSebagian: '',
+      catatanPanitia: '',
+    });
+  });
+
+  it('handles null/undefined data', () => {
+    expect(extractPermintaan(null as any)).toEqual({
+      hak: '', permintaanKhusus: '', catatanSebagian: '', catatanPanitia: '',
+    });
+  });
+});
+
+describe('summarizePermintaan (1-liner)', () => {
+  it('returns dash for all-empty', () => {
+    expect(summarizePermintaan([{ hak: '', permintaanKhusus: '', catatanSebagian: '', catatanPanitia: '' }])).toBe('—');
+  });
+
+  it('joins permintaan khusus for single sohibul', () => {
+    expect(summarizePermintaan([{ hak: 'Paha kanan', permintaanKhusus: 'Kaki', catatanSebagian: '', catatanPanitia: '' }])).toContain('Kaki');
+  });
+
+  it('truncates long output to ~40 char', () => {
+    const long = summarizePermintaan([
+      { hak: '', permintaanKhusus: 'Kaki, ekor, lidah, has dalam, paha, iga, sandung lamur', catatanSebagian: '', catatanPanitia: '' },
+    ]);
+    expect(long.length).toBeLessThanOrEqual(43); // 40 + ellipsis "..."
+  });
+
+  it('prefixes nama for kolektif (multiple sohibul)', () => {
+    const out = summarizePermintaan([
+      { name: 'Asep', hak: '', permintaanKhusus: 'Kaki', catatanSebagian: '', catatanPanitia: '' },
+      { name: 'Margono', hak: '', permintaanKhusus: 'Has dalam', catatanSebagian: '', catatanPanitia: '' },
+    ]);
+    expect(out).toMatch(/Asep/);
+    expect(out).toMatch(/Margono/);
+  });
+});
+```
+
+- [ ] **Step 2: Run test, expect fail**
+
+Run: `npx jest src/scheduling/scheduling-mappers.spec.ts`
+
+Expected: FAIL "extractPermintaan is not exported".
+
+- [ ] **Step 3: Implement mappers**
+
+Append to `src/scheduling/scheduling-mappers.ts`:
+
+```typescript
+export interface Permintaan {
+  hak: string;
+  permintaanKhusus: string;
+  catatanSebagian: string;
+  catatanPanitia: string;
+  name?: string;
+}
+
+export function extractPermintaan(data: Record<string, string> | null | undefined): Permintaan {
+  const d = data ?? {};
+  return {
+    hak: (d['Hak daging qurban untuk Sohibul Qurban'] ?? '').trim(),
+    permintaanKhusus: (d['Permintaan khusus untuk bagian tertentu untuk Sohibul Qurban'] ?? '').trim(),
+    catatanSebagian: (d['Catatan pengambilan hak sebagian'] ?? '').trim(),
+    catatanPanitia: (d['Catatan Khusus untuk Panitia'] ?? '').trim(),
+  };
+}
+
+export function summarizePermintaan(items: Permintaan[]): string {
+  const MAX_LEN = 40;
+  const parts: string[] = [];
+  for (const p of items) {
+    const interesting = [p.permintaanKhusus, p.catatanSebagian].filter(Boolean).join(' / ');
+    if (!interesting) continue;
+    parts.push(p.name ? `${p.name}:${interesting}` : interesting);
+  }
+  if (parts.length === 0) return '—';
+  const joined = parts.join(' • ');
+  if (joined.length <= MAX_LEN) return joined;
+  return joined.slice(0, MAX_LEN) + '...';
+}
+```
+
+- [ ] **Step 4: Run test, expect pass**
+
+Run: `npx jest src/scheduling/scheduling-mappers.spec.ts`
+
+Expected: pass.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/scheduling/scheduling-mappers.ts src/scheduling/scheduling-mappers.spec.ts
+git commit -m "feat(scheduling): extractPermintaan + summarizePermintaan mappers"
+```
+
+### Task 16b: Service — getSesetData (cheat sheet payload)
+
+**Files:**
+- Modify: `src/scheduling/scheduling.service.ts`
+
+- [ ] **Step 1: Add method**
+
+Append in `SchedulingService` class:
+
+```typescript
+  /**
+   * Cheat sheet untuk tim jagal/seset: list animal yang udah dijadwalkan, dengan
+   * permintaan tiap sohibul. Individual = 1 sohibul; kolektif = many.
+   */
+  async getSesetData(
+    eventId: string,
+    team?: Team,
+  ): Promise<Array<{
+    animal: Animal;
+    sohibulRequests: Array<{ name: string; phone: string | null } & import('./scheduling-mappers').Permintaan>;
+  }>> {
+    const formKey = process.env.KONFIRMASI_TEKNIS_FORM_KEY;
+    const items = await this.getSchedule(eventId, team);
+
+    return Promise.all(
+      items.map(async ({ animal, pengkurban }) => {
+        const sohibulRequests = await Promise.all(
+          pengkurban.map(async (pk) => {
+            const fr = formKey
+              ? await this.formRepo.findOne({ where: { pengkurbanId: pk.id, formKey } })
+              : null;
+            const { extractPermintaan } = await import('./scheduling-mappers');
+            const perm = extractPermintaan(fr?.data ?? null);
+            return { name: pk.name, phone: pk.phone ?? null, ...perm };
+          }),
+        );
+        return { animal, sohibulRequests };
+      }),
+    );
+  }
+```
+
+- [ ] **Step 2: Build**
+
+Run: `npm run build`
+
+Expected: clean.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add src/scheduling/scheduling.service.ts
+git commit -m "feat(scheduling): getSesetData service method"
+```
+
+### Task 16c: Controller endpoint — GET /seset (JSON)
+
+**Files:**
+- Modify: `src/scheduling/scheduling.controller.ts`
+
+- [ ] **Step 1: Add endpoint**
+
+```typescript
+@Get('seset')
+@Roles(Role.SUPER_ADMIN, Role.KETUA_PANITIA, Role.PANITIA_VOUCHER, Role.PANITIA_SCANNER)
+async sesetData(@Query('eventId') eventId: string, @Query('team') team?: Team) {
+  if (!eventId) throw new BadRequestException('eventId required');
+  return this.service.getSesetData(eventId, team);
+}
+```
+
+- [ ] **Step 2: Build**
+
+Run: `npm run build`
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add src/scheduling/scheduling.controller.ts
+git commit -m "feat(scheduling): GET /seset endpoint (cheat sheet JSON)"
+```
+
+### Task 16d: PDF jadwal — tambah kolom Permintaan
+
+**Files:**
+- Modify: `src/scheduling/scheduling-pdf.service.ts`
+
+- [ ] **Step 1: Modify generate() to include permintaan column**
+
+Update `SchedulingPdfService.generate` to call `getSesetData` instead of `getSchedule` (gives access to per-sohibul permintaan), then render 1-line summary per row:
+
+```typescript
+import { summarizePermintaan } from './scheduling-mappers';
+
+// in generate():
+const sapi = await this.schedulingService.getSesetData(eventId, 'SAPI');
+const kambing = await this.schedulingService.getSesetData(eventId, 'KAMBING_DOMBA');
+
+// in render loop, modify each row to include permintaan summary:
+function renderRow(it: any, x: number, y: number, w: number) {
+  if (!it.animal.scheduledAt) return;
+  const time = fmtTime(new Date(it.animal.scheduledAt));
+  const name = it.sohibulRequests[0]?.name ?? '(vendor)';
+  const permintaan = summarizePermintaan(
+    it.sohibulRequests.map((s: any) => ({ ...s, name: it.sohibulRequests.length > 1 ? s.name : undefined })),
+  );
+  doc.fontSize(10).text(`${time}  ${name}`, x, y, { width: w });
+  doc.fontSize(8).fillColor('#666').text(`Permintaan: ${permintaan}`, x, y + 12, { width: w });
+  doc.fillColor('#000');
+}
+```
+
+Adjust row height (now ~24px instead of 16px) and tableY iteration accordingly.
+
+- [ ] **Step 2: Update test**
+
+Modify `scheduling-pdf.service.spec.ts` to mock `getSesetData` instead of `getSchedule`. Add assertion that "Permintaan" string appears in buffer (via simple substring search of PDF text — pdfkit embeds text in stream).
+
+- [ ] **Step 3: Run tests**
+
+```bash
+npx jest src/scheduling/scheduling-pdf.service.spec.ts
+```
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add src/scheduling/scheduling-pdf.service.ts src/scheduling/scheduling-pdf.service.spec.ts
+git commit -m "feat(scheduling): tambah kolom Permintaan di PDF jadwal"
+```
+
+### Task 16e: PDF cheat sheet seset (long-form per hewan)
+
+**Files:**
+- Create: `src/scheduling/scheduling-seset-pdf.service.ts`
+- Create: `src/scheduling/scheduling-seset-pdf.service.spec.ts`
+
+- [ ] **Step 1: Implement service**
+
+`src/scheduling/scheduling-seset-pdf.service.ts`:
+```typescript
+import { Injectable } from '@nestjs/common';
+import { SchedulingService } from './scheduling.service';
+
+const PDFDocument = require('pdfkit');
+
+function fmtTime(d: Date): string {
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+@Injectable()
+export class SchedulingSesetPdfService {
+  constructor(private readonly schedulingService: SchedulingService) {}
+
+  async generate(eventId: string): Promise<Buffer> {
+    const items = await this.schedulingService.getSesetData(eventId);
+
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ size: 'A4', layout: 'portrait', margin: 40 });
+      const buffers: Buffer[] = [];
+      doc.on('data', (b: Buffer) => buffers.push(b));
+      doc.on('end', () => resolve(Buffer.concat(buffers)));
+      doc.on('error', reject);
+
+      doc.fontSize(16).text('Cheat Sheet Tim Seset — 1447H', { align: 'center' });
+      doc.fontSize(9).text('Masjid Al Hijrah CGE', { align: 'center' });
+      doc.moveDown();
+
+      let isFirst = true;
+      for (const it of items) {
+        if (!it.animal.scheduledAt) continue;
+        if (!isFirst && doc.y > doc.page.height - 200) {
+          doc.addPage();
+        }
+        isFirst = false;
+
+        const time = fmtTime(new Date(it.animal.scheduledAt));
+        const team = it.animal.scheduledTeam === 'SAPI' ? 'SAPI' : 'KAMBING/DOMBA';
+
+        // Animal card header
+        doc.fontSize(12).fillColor('#000').text(
+          `${time} • Tim ${team} • ${it.animal.animalCode} (${it.animal.animalType})`,
+          { underline: true },
+        );
+        doc.moveDown(0.3);
+
+        if (it.sohibulRequests.length === 0) {
+          doc.fontSize(10).fillColor('#888').text('(vendor — tidak ada permintaan)');
+          doc.moveDown();
+          continue;
+        }
+
+        for (const s of it.sohibulRequests) {
+          doc.fontSize(11).fillColor('#000').text(`Sohibul: ${s.name}`);
+          doc.fontSize(9).fillColor('#444');
+          doc.text(`  Hak: ${s.hak || '—'}`);
+          doc.text(`  Permintaan khusus: ${s.permintaanKhusus || '—'}`);
+          doc.text(`  Catatan pengambilan: ${s.catatanSebagian || '—'}`);
+          doc.text(`  Catatan untuk panitia: ${s.catatanPanitia || '—'}`);
+          doc.moveDown(0.2);
+        }
+
+        doc.moveDown(0.5);
+        doc.strokeColor('#ccc').moveTo(40, doc.y).lineTo(doc.page.width - 40, doc.y).stroke();
+        doc.moveDown(0.5);
+      }
+
+      const now = new Date();
+      doc.fontSize(7).fillColor('#888').text(
+        `Generated ${now.toISOString()}`,
+        40,
+        doc.page.height - 30,
+        { align: 'center', width: doc.page.width - 80 },
+      );
+
+      doc.end();
+    });
+  }
+}
+```
+
+- [ ] **Step 2: Smoke test**
+
+`src/scheduling/scheduling-seset-pdf.service.spec.ts`:
+```typescript
+import { Test } from '@nestjs/testing';
+import { SchedulingSesetPdfService } from './scheduling-seset-pdf.service';
+import { SchedulingService } from './scheduling.service';
+
+describe('SchedulingSesetPdfService', () => {
+  it('produces non-empty PDF', async () => {
+    const svc = {
+      getSesetData: jest.fn().mockResolvedValue([
+        {
+          animal: { animalCode: 'ANM-1', animalType: 'SAPI_PERORANGAN', scheduledAt: new Date('2026-06-06T07:30:00+07:00'), scheduledTeam: 'SAPI' },
+          sohibulRequests: [{
+            name: 'Asep', phone: '0812', hak: 'Paha kanan', permintaanKhusus: 'Kaki', catatanSebagian: '', catatanPanitia: '',
+          }],
+        },
+      ]),
+    };
+    const m = await Test.createTestingModule({
+      providers: [SchedulingSesetPdfService, { provide: SchedulingService, useValue: svc }],
+    }).compile();
+    const buf = await m.get(SchedulingSesetPdfService).generate('event-1');
+    expect(buf.length).toBeGreaterThan(500);
+    expect(buf.subarray(0, 4).toString()).toBe('%PDF');
+  });
+});
+```
+
+- [ ] **Step 3: Wire endpoint + module**
+
+Modify `src/scheduling/scheduling.controller.ts`:
+```typescript
+import { SchedulingSesetPdfService } from './scheduling-seset-pdf.service';
+
+// constructor add: private readonly sesetPdf: SchedulingSesetPdfService
+
+@Get('seset/pdf')
+@Roles(Role.SUPER_ADMIN, Role.KETUA_PANITIA, Role.PANITIA_VOUCHER, Role.PANITIA_SCANNER)
+async sesetPdfExport(@Query('eventId') eventId: string, @Res() res: Response) {
+  if (!eventId) throw new BadRequestException('eventId required');
+  const buf = await this.sesetPdf.generate(eventId);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="seset-${eventId.slice(0,8)}.pdf"`);
+  res.end(buf);
+}
+```
+
+Modify `src/scheduling/scheduling.module.ts`:
+```typescript
+import { SchedulingSesetPdfService } from './scheduling-seset-pdf.service';
+providers: [..., SchedulingSesetPdfService],
+```
+
+- [ ] **Step 4: Build + test + commit**
+
+```bash
+npm run build
+npx jest src/scheduling/scheduling-seset-pdf.service.spec.ts
+git add src/scheduling/scheduling-seset-pdf.service.ts src/scheduling/scheduling-seset-pdf.service.spec.ts src/scheduling/scheduling.controller.ts src/scheduling/scheduling.module.ts
+git commit -m "feat(scheduling): cheat sheet PDF tim seset"
+```
+
+### Task 16f: Frontend — seset.html cheat sheet page
+
+**Files:**
+- Create: `client/seset.html`
+- Create: `client/js/seset.js`
+- Modify: `client/js/app.js` (sidebar)
+
+- [ ] **Step 1: Create page**
+
+`client/seset.html`:
+```html
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <title>Cheat Sheet Seset — Panitia Kurban</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/js/app.js" defer></script>
+</head>
+<body class="bg-gray-50">
+  <div id="layout"></div>
+  <main class="max-w-4xl mx-auto p-4">
+    <div class="flex items-center justify-between mb-4">
+      <h1 class="text-xl font-bold">Cheat Sheet Tim Seset</h1>
+      <select id="eventSelect" class="border rounded p-2"></select>
+    </div>
+    <div class="flex gap-2 mb-4">
+      <select id="teamFilter" class="border rounded p-2">
+        <option value="">Semua tim</option>
+        <option value="SAPI">Tim SAPI</option>
+        <option value="KAMBING_DOMBA">Tim KAMBING/DOMBA</option>
+      </select>
+      <button id="btnPdf" class="bg-gray-200 px-4 py-2 rounded">Download PDF</button>
+    </div>
+    <div id="content"></div>
+  </main>
+  <script src="/js/seset.js" defer></script>
+</body>
+</html>
+```
+
+- [ ] **Step 2: Create JS**
+
+`client/js/seset.js`:
+```javascript
+(async () => {
+  const $ = (s) => document.querySelector(s);
+  let currentEventId = null;
+
+  async function loadEvents() {
+    const events = await api('/events');
+    const sel = $('#eventSelect');
+    sel.innerHTML = events.map((e) => `<option value="${e.id}">${e.hijriYear ?? e.name ?? e.id}</option>`).join('');
+    currentEventId = events[0]?.id;
+    sel.onchange = () => { currentEventId = sel.value; refresh(); };
+  }
+
+  function fmtTime(iso) {
+    const d = new Date(iso);
+    return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  }
+
+  function teamLabel(t) {
+    return t === 'SAPI' ? 'SAPI' : 'KAMBING/DOMBA';
+  }
+
+  function renderCard(it) {
+    if (!it.animal.scheduledAt) return '';
+    const sohibulHtml = it.sohibulRequests.length === 0
+      ? '<p class="text-gray-500 italic">(vendor — tidak ada permintaan)</p>'
+      : it.sohibulRequests.map((s) => `
+        <div class="ml-4 mb-3">
+          <div class="font-semibold">Sohibul: ${s.name}</div>
+          <div class="text-sm text-gray-700">Hak: ${s.hak || '—'}</div>
+          <div class="text-sm text-gray-700">Permintaan khusus: ${s.permintaanKhusus || '—'}</div>
+          <div class="text-sm text-gray-700">Catatan pengambilan: ${s.catatanSebagian || '—'}</div>
+          <div class="text-sm text-gray-700">Catatan untuk panitia: ${s.catatanPanitia || '—'}</div>
+        </div>
+      `).join('');
+
+    return `
+      <div class="bg-white p-4 mb-3 rounded shadow-sm border">
+        <div class="font-mono text-blue-900 font-bold mb-2">
+          ${fmtTime(it.animal.scheduledAt)} • Tim ${teamLabel(it.animal.scheduledTeam)} • ${it.animal.animalCode} (${it.animal.animalType})
+        </div>
+        ${sohibulHtml}
+      </div>
+    `;
+  }
+
+  async function refresh() {
+    if (!currentEventId) return;
+    const team = $('#teamFilter').value;
+    const url = team ? `/scheduling/seset?eventId=${currentEventId}&team=${team}` : `/scheduling/seset?eventId=${currentEventId}`;
+    const items = await api(url);
+    $('#content').innerHTML = items.map(renderCard).join('') || '<p class="text-gray-500">Belum ada jadwal. Generate dulu di halaman Jadwal.</p>';
+  }
+
+  $('#teamFilter').onchange = refresh;
+  $('#btnPdf').onclick = () => window.open(`/api/scheduling/seset/pdf?eventId=${currentEventId}`, '_blank');
+
+  await loadEvents();
+  await refresh();
+})();
+```
+
+- [ ] **Step 3: Add sidebar nav (deferred — combined with Task 17)**
+
+Note for Task 17: tambah 2 nav item sekaligus — "Jadwal Penyembelihan" + "Cheat Sheet Seset" (📋, href `/seset.html`, roles SUPER_ADMIN/KETUA/VOUCHER/SCANNER).
+
+- [ ] **Step 4: Smoke**
+
+Visit `http://localhost:3000/seset.html` after generate jadwal di Task 19. Verify cards render dengan permintaan per sohibul. Filter tim → list ke-filter. Klik Download PDF → file download.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add client/seset.html client/js/seset.js
+git commit -m "feat(scheduling): seset.html cheat sheet UI"
+```
+
+---
+
 ## Frontend: Admin UI
 
 ### Task 17: Sidebar nav item "Jadwal"
@@ -1617,7 +2156,7 @@ git commit -m "feat(scheduling): PDF export"
 
 Run: `grep -n "Hewan\|navItems\|getRoleNav" /Users/fajarfirdaus/Development/panitia-kurban/client/js/app.js | head -10`
 
-- [ ] **Step 2: Add nav item between "Hewan" and "Scan Kartu Hewan"**
+- [ ] **Step 2: Add nav items between "Hewan" and "Scan Kartu Hewan"**
 
 Find the entry for `{ label: 'Hewan', ... }` and insert after:
 
@@ -1627,6 +2166,12 @@ Find the entry for `{ label: 'Hewan', ... }` and insert after:
   icon: '📅',
   href: '/jadwal.html',
   roles: ['SUPER_ADMIN', 'KETUA_PANITIA', 'PANITIA_VOUCHER'],
+},
+{
+  label: 'Cheat Sheet Seset',
+  icon: '📋',
+  href: '/seset.html',
+  roles: ['SUPER_ADMIN', 'KETUA_PANITIA', 'PANITIA_VOUCHER', 'PANITIA_SCANNER'],
 },
 ```
 

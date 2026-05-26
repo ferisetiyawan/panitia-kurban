@@ -28,7 +28,8 @@ Phase 2 (operasional hari-H: status WAITING/IN_PROGRESS/DONE, live view antrian,
 |---|---|
 | Algoritma jadwal generator (soft-honor preferensi) | — (backend) |
 | `client/jadwal.html` — admin generate/edit/export/broadcast | SUPER_ADMIN, KETUA_PANITIA |
-| PDF export jadwal A4 untuk print di tenda | Admin |
+| PDF jadwal A4 untuk print di tenda (kolom: jam, sohibul, **permintaan ringkas**) | Admin |
+| **`client/seset.html` + PDF cheat sheet tim jagal/seset** (detail permintaan per hewan) | SUPER_ADMIN, KETUA_PANITIA, PANITIA_VOUCHER, PANITIA_SCANNER |
 | WA broadcast ke grup sohibul + grup panitia (via wa-bot) | Admin trigger |
 | Section "Jadwal Anda" di `portal-dashboard.html` | Sohibul (existing portal auth) |
 | Endpoint `GET /api/scheduling` (JSON, dipakai admin UI + portal) | Authenticated |
@@ -258,6 +259,8 @@ UI tampilin `mismatches` dan `unscheduled_without_preferensi` biar admin tau sia
 | `GET` | `/api/scheduling/pdf` | SUPER_ADMIN, KETUA_PANITIA, PANITIA_VOUCHER | `?eventId=` | `application/pdf` stream |
 | `POST` | `/api/scheduling/broadcast` | SUPER_ADMIN, KETUA_PANITIA | `{ eventId, target: 'sohibul_group'\|'panitia_group', dryRun? }` | `{ sent: bool, preview?: string, group_jid }` |
 | `GET` | `/api/public/scheduling/me` | sohibul portal token (existing) | — | `[{ animalCode, animalType, scheduledAt, scheduledTeam }]` untuk hewan-hewan sohibul yang login |
+| `GET` | `/api/scheduling/seset` | SUPER_ADMIN, KETUA_PANITIA, PANITIA_VOUCHER, PANITIA_SCANNER | `?eventId=&team=` | `[{ animal, slot, sohibulRequests: [{ name, hak, permintaanKhusus, catatanSebagian, catatanPanitia }] }]` |
+| `GET` | `/api/scheduling/seset/pdf` | sama | `?eventId=` | `application/pdf` cheat sheet untuk tim jagal/seset |
 
 ## 7. UI
 
@@ -381,6 +384,75 @@ _Generated 2026-06-05 21:30 WIB by Fajar_
   - `WA_SOHIBUL_GROUP_JID` — wajib di prod sebelum fitur dipakai; kalau ga di-set, endpoint return 503 "grup belum dikonfigurasi"
   - `WA_PANITIA_GROUP_JID` — opsional, fallback ke `WA_NOTIFY_PHONE` (1-on-1 ke Fajar) kalau ga di-set
 
+## 8.5 Daftar Permintaan Daging (Cheat Sheet Tim Jagal/Seset)
+
+Tim jagal & seset butuh info dari form sohibul untuk tau apa yang diminta per hewan (potongan tertentu, kg, dll). Data sudah ada di `form-responses` (`konfirmasi_teknis_1447h`), tinggal di-extract + display.
+
+### 8.5.1 Sumber data (form kolom)
+
+Per pengkurban yang isi form, ambil:
+
+| Kolom form | Field internal | Contoh isi |
+|---|---|---|
+| "Hak daging qurban untuk Sohibul Qurban" | `hak` | "Ambil Hak Paha Kanan untuk hewan qurban perorangan" |
+| "Permintaan khusus untuk bagian tertentu untuk Sohibul Qurban" | `permintaanKhusus` | "Kaki", "Ekor", "Has Dalam", "Ekor, Lidah" |
+| "Catatan pengambilan hak sebagian" | `catatanSebagian` | "Daging paha kanan 4kg, Has dalam 3 kg, tulang 3kg" |
+| "Catatan Khusus untuk Panitia" | `catatanPanitia` | "Bagian has dalam bila memungkinkan" |
+
+Mapper: `extractPermintaan(formData: Record<string, string>): Permintaan`. Test cases: full row, partial row, kolom kosong → empty string fields.
+
+### 8.5.2 Output 1 — kolom "Permintaan" di PDF jadwal (Bagian 9)
+
+Tambah 1 kolom singkat di PDF jadwal supaya tim jagal yang pegang jadwal langsung tau ada permintaan apa per slot. Format:
+
+- Kalau ada ≥1 field non-empty → tampil **ringkas 1-baris** (truncate ~40 char): "Paha kanan + ekor"
+- Kalau semua empty → "—"
+- Kolektif: gabung permintaan semua sohibul, sambil prefix nama: "Asep:kaki / Margono:has dalam"
+- Detail lengkap → lihat cheat sheet seset (Output 2)
+
+### 8.5.3 Output 2 — cheat sheet detail `/seset.html` + PDF
+
+Halaman terpisah untuk tim seset (yang motong/membagi daging). Format per-hewan, long-form.
+
+**UI `client/seset.html`:**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Cheat Sheet Seset — Event 1447H               [Event ▾]     │
+│                                                              │
+│ [Filter Tim ▾]  [Download PDF]                              │
+├─────────────────────────────────────────────────────────────┤
+│ 07:30 │ Tim SAPI │ ANM-1447H-A1B2C3D4 (kolektif)            │
+│ ────────────────────────────────────────────────────────────│
+│ Sohibul 1: Asep Jamaluddin                                  │
+│   Hak: Ambil Hak ± 3 Kg untuk sapi kolektif                 │
+│   Permintaan khusus: Kaki                                   │
+│   Catatan: -                                                │
+│   Catatan panitia: -                                        │
+│ Sohibul 2: Margono                                          │
+│   Hak: Ambil Hak ± 3 Kg untuk sapi kolektif                 │
+│   ...                                                        │
+│ ────────────────────────────────────────────────────────────│
+│ 07:45 │ Tim SAPI │ ANM-...                                  │
+│ ...                                                          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**PDF cheat sheet** (`GET /api/scheduling/seset/pdf`):
+- A4 portrait, 1 hewan per "card" (block 1/3 halaman atau dinamis)
+- Header: jam + tim + animal code
+- Body: list sohibul → 4 baris (hak, permintaan khusus, catatan sebagian, catatan panitia)
+- Pagination: kalau hewan banyak, lanjut halaman berikutnya
+- Reuse pdfkit pattern dari Bagian 9
+
+**Akses role:** SUPER_ADMIN, KETUA_PANITIA, PANITIA_VOUCHER, PANITIA_SCANNER (tim jagal/seset adalah scanner role).
+
+### 8.5.4 Edge cases
+
+- Vendor animal (no sohibul) → cheat sheet skip ATAU tampil "(vendor, tidak ada permintaan)"
+- Sohibul belum isi form → tampil "(belum isi form konfirmasi)"
+- Field kosong → tampil "—"
+
 ## 9. PDF Export
 
 Reuse pattern dari `src/vouchers/vouchers.service.ts` (pdfkit).
@@ -397,6 +469,7 @@ Reuse pattern dari `src/vouchers/vouchers.service.ts` (pdfkit).
   - Kolom 1: jam (bold, 14pt)
   - Kolom 2: nama pengkurban + label hewan (12pt)
   - Kolom 3 (small, italic): animal code
+  - **Kolom 4 (italic 9pt): permintaan ringkas** (lihat §8.5.2 — truncate ~40 char)
 - Overflow rows: background tipis kuning (warning)
 - Multi-page kalau panjang
 
@@ -409,6 +482,8 @@ Reuse pattern dari `src/vouchers/vouchers.service.ts` (pdfkit).
 | `scheduling.controller.spec.ts` | Role guard enforcement (smoke), basic CRUD plumbing dengan service mocked |
 | `scheduling-broadcast.service.spec.ts` | Template rendering, sapi kolektif name fan-out di grup post, dry-run path, env-missing error |
 | `scheduling-pdf.service.spec.ts` | Smoke: generate PDF buffer non-empty, content includes expected strings (extract via pdf-parse atau cukup check buffer size) |
+| `scheduling-permintaan.spec.ts` | `extractPermintaan` mapper: full form data, partial, empty, kolektif aggregation |
+| `scheduling-seset-pdf.service.spec.ts` | Smoke cheat sheet PDF buffer non-empty |
 
 **Manual / smoke (post-deploy ke prod):**
 1. SSH/cPanel: pastikan migration §4 udah di-apply ke Neon
