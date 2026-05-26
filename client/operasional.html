@@ -179,7 +179,7 @@
             <div class="flex flex-wrap gap-2 mt-3">
               <button class="btn-big btn-selesai" data-action="done" data-id="${esc(it.animal.id)}">✅ Selesai</button>
               <button class="btn-big btn-foto" data-action="foto" data-id="${esc(it.animal.id)}" data-label="${esc(sohibulSummary(it.pengkurban).replace(/<[^>]*>/g,''))}">📸 Foto</button>
-              <button class="btn-big btn-skip" data-action="skip" data-id="${esc(it.animal.id)}">⏭️ Skip</button>
+              <button class="btn-big btn-skip" data-action="skip" data-id="${esc(it.animal.id)}" title="Tunda (sohibul belum datang) — bisa di-Lanjutkan nanti">⏸️ Tunda</button>
               <button class="btn-reset" data-action="reset" data-id="${esc(it.animal.id)}">↩ reset</button>
             </div>
           </div>
@@ -187,14 +187,17 @@
       }
 
       function renderNextCard(it, isFirst) {
+        // Mulai button di SEMUA next cards (panitia di lapangan bisa skip ke hewan mana saja).
+        // First card visually highlighted; rest pakai button outline lebih kalem.
+        const btnClass = isFirst ? 'btn-big btn-mulai' : 'btn-big btn-mulai';
         return `
           <div class="ops-card next">
-            <div class="flex justify-between items-start">
+            <div class="flex justify-between items-start gap-2">
               <div>
-                <div class="font-bold text-white">${sohibulSummary(it.pengkurban)}</div>
+                <div class="font-bold text-white">${sohibulSummary(it.pengkurban)}${isFirst ? ' <span class="text-xs text-emerald-300">← sesuai jadwal</span>' : ''}</div>
                 <div class="text-xs text-gray-200 font-mono">${esc(it.animal.animalCode)} • Jadwal ${fmtTime(it.animal.scheduledAt)}</div>
               </div>
-              ${isFirst ? `<button class="btn-big btn-mulai" data-action="start" data-id="${esc(it.animal.id)}">▶ Mulai</button>` : ''}
+              <button class="${btnClass}" data-action="start" data-id="${esc(it.animal.id)}">▶ Mulai</button>
             </div>
           </div>
         `;
@@ -203,17 +206,22 @@
       function renderDoneCard(it) {
         const doneAt = it.animal.slaughterDoneAt ? fmtTime(it.animal.slaughterDoneAt) : '—';
         const photos = Array.isArray(it.animal.photos) ? it.animal.photos.length : 0;
-        const statusLabel = it.animal.slaughterStatus === 'SKIPPED' ? '⏭️ Skipped' : '✅ Done';
+        const isSkipped = it.animal.slaughterStatus === 'SKIPPED';
+        const statusLabel = isSkipped ? '⏸️ Ditunda (belum dipotong)' : '✅ Done';
+        // SKIPPED: prominent "Lanjutkan" button (reset back to WAITING so panitia bisa Mulai lagi)
+        const resumeBtn = isSkipped
+          ? `<button class="btn-big btn-mulai" data-action="reset" data-id="${esc(it.animal.id)}" title="Sohibul sudah datang — kembalikan ke antrian">▶ Lanjutkan</button>`
+          : `<button class="btn-reset" data-action="reset" data-id="${esc(it.animal.id)}">↩ reset</button>`;
         return `
           <div class="ops-card done">
-            <div class="flex justify-between items-center">
+            <div class="flex justify-between items-center gap-2">
               <div>
                 <div class="text-sm text-gray-200">${sohibulSummary(it.pengkurban)}</div>
                 <div class="text-xs text-gray-400 font-mono">${esc(it.animal.animalCode)} • ${statusLabel} ${doneAt} • ${photos} foto</div>
               </div>
               <div class="flex gap-1">
                 <button class="btn-big btn-foto" data-action="foto" data-id="${esc(it.animal.id)}" data-label="${esc(sohibulSummary(it.pengkurban).replace(/<[^>]*>/g,''))}">📸</button>
-                <button class="btn-reset" data-action="reset" data-id="${esc(it.animal.id)}">↩</button>
+                ${resumeBtn}
               </div>
             </div>
           </div>
@@ -263,8 +271,8 @@
               openPhotoModal(id, btn.dataset.label || '');
               return;
             }
-            if (action === 'skip' && !confirm('Skip hewan ini (tandai sebagai selesai tanpa dipotong)?')) return;
-            if (action === 'reset' && !confirm('Reset status hewan ke WAITING?')) return;
+            if (action === 'skip' && !confirm('Tunda hewan ini? (sohibul belum datang — tetap bisa di-Lanjutkan nanti dari section Selesai)')) return;
+            if (action === 'reset' && !confirm('Kembalikan hewan ke antrian WAITING?')) return;
             btn.disabled = true;
             btn.style.opacity = '0.5';
             try {
