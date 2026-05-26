@@ -35,8 +35,8 @@
     </div>
 
     <div class="flex flex-wrap items-center gap-3 mb-4">
-      <select id="eventSelect" class="border rounded p-2 bg-white"></select>
-      <select id="teamFilter" class="border rounded p-2 bg-white">
+      <select id="eventSelect" class="border rounded p-2 bg-white text-gray-900"></select>
+      <select id="teamFilter" class="border rounded p-2 bg-white text-gray-900">
         <option value="">Semua tim</option>
         <option value="SAPI">Tim SAPI</option>
         <option value="KAMBING_DOMBA">Tim KAMBING/DOMBA</option>
@@ -83,7 +83,7 @@
           `).join('');
 
         return `
-          <div class="bg-white p-4 rounded shadow-sm border">
+          <div class="bg-white p-4 rounded shadow-sm border text-gray-900">
             <div class="font-mono text-blue-900 font-bold mb-2">
               ${fmtTime(it.animal.scheduledAt)} • Tim ${teamLabel(it.animal.scheduledTeam)} • ${esc(it.animal.animalCode)} (${esc(it.animal.animalType)})
             </div>
@@ -112,7 +112,7 @@
           const items = await api(`/scheduling/seset${qs}`);
           $('#content').innerHTML = items.length
             ? items.map(renderCard).join('')
-            : '<p class="text-gray-500">Belum ada jadwal. Generate dulu di halaman Jadwal Penyembelihan.</p>';
+            : '<p class="text-gray-100">Belum ada jadwal. Generate dulu di halaman Jadwal Penyembelihan.</p>';
         } catch (e) {
           $('#content').innerHTML = `<p class="text-red-600">Gagal memuat: ${esc(e.message || e)}</p>`;
         }

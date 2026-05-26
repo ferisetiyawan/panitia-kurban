@@ -127,6 +127,12 @@ export class SchedulingService {
    */
   async loadEligibleAnimals(eventId: string): Promise<EligibleAnimal[]> {
     const formKey = process.env.KONFIRMASI_TEKNIS_FORM_KEY;
+    const excludeRegs = new Set(
+      (process.env.SCHEDULING_EXCLUDE_REGS || '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+    );
     const animals = await this.animalRepo.find({ where: { eventId } });
 
     const result: EligibleAnimal[] = [];
@@ -138,6 +144,7 @@ export class SchedulingService {
       if (animal.pengkurbanId) {
         const pk = await this.pengkurbanRepo.findOne({ where: { id: animal.pengkurbanId } });
         if (!pk || !['CONFIRMED', 'PENDING_VERIFICATION'].includes(pk.status)) continue;
+        if (excludeRegs.has(pk.registrationNumber)) continue;
         const preferensi = await this.preferensiForPengkurban(pk.id, formKey);
         result.push({ animal, preferensi });
       } else if (KOLEKTIF_TYPES.includes(animal.animalType)) {
@@ -148,9 +155,12 @@ export class SchedulingService {
             status: In(['CONFIRMED', 'PENDING_VERIFICATION']) as any,
           },
         });
-        if (eligible.length === 0) continue;
+        const eligibleNotExcluded = eligible.filter(
+          (pk) => !excludeRegs.has(pk.registrationNumber),
+        );
+        if (eligibleNotExcluded.length === 0) continue;
         const prefs = await Promise.all(
-          eligible.map((pk) => this.preferensiForPengkurban(pk.id, formKey)),
+          eligibleNotExcluded.map((pk) => this.preferensiForPengkurban(pk.id, formKey)),
         );
         const valid = prefs.filter((p): p is PreferensiTime => !!p);
         const earliest = valid.length

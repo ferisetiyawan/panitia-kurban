@@ -35,7 +35,7 @@
     </div>
 
     <div class="flex flex-wrap items-center gap-3 mb-4">
-      <select id="eventSelect" class="border rounded p-2 bg-white"></select>
+      <select id="eventSelect" class="border rounded p-2 bg-white text-gray-900"></select>
       <button id="btnGenerate" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">⚙️ Generate Ulang</button>
       <button id="btnPdf" class="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded">📥 Export PDF</button>
       <div class="relative inline-block">
@@ -48,31 +48,31 @@
       <button id="btnRefresh" class="bg-blue-100 hover:bg-blue-200 px-4 py-2 rounded">🔄 Refresh</button>
     </div>
 
-    <div id="summary" class="mb-4 text-sm text-gray-600"></div>
+    <div id="summary" class="mb-4 text-sm text-gray-100"></div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <section class="bg-white p-3 rounded shadow-sm border">
-        <h2 class="font-semibold mb-2">Tim SAPI</h2>
+      <section class="bg-white p-3 rounded shadow-sm border text-gray-900">
+        <h2 class="font-semibold mb-2 text-gray-900">Tim SAPI</h2>
         <table class="w-full border-collapse" id="tableSapi">
-          <thead><tr class="bg-gray-100"><th class="text-left p-2">Jam</th><th class="text-left p-2">Sohibul / Hewan</th></tr></thead>
+          <thead><tr class="bg-gray-100 text-gray-900"><th class="text-left p-2">Jam</th><th class="text-left p-2">Sohibul / Hewan</th></tr></thead>
           <tbody></tbody>
         </table>
       </section>
-      <section class="bg-white p-3 rounded shadow-sm border">
-        <h2 class="font-semibold mb-2">Tim KAMBING/DOMBA</h2>
+      <section class="bg-white p-3 rounded shadow-sm border text-gray-900">
+        <h2 class="font-semibold mb-2 text-gray-900">Tim KAMBING/DOMBA</h2>
         <table class="w-full border-collapse" id="tableKambing">
-          <thead><tr class="bg-gray-100"><th class="text-left p-2">Jam</th><th class="text-left p-2">Sohibul / Hewan</th></tr></thead>
+          <thead><tr class="bg-gray-100 text-gray-900"><th class="text-left p-2">Jam</th><th class="text-left p-2">Sohibul / Hewan</th></tr></thead>
           <tbody></tbody>
         </table>
       </section>
     </div>
 
-    <section id="mismatchSection" class="mt-6 hidden bg-yellow-50 p-3 rounded border border-yellow-200">
+    <section id="mismatchSection" class="mt-6 hidden bg-yellow-50 p-3 rounded border border-yellow-200 text-gray-900">
       <h2 class="font-semibold mb-2">⚠️ Mismatches</h2>
       <ul id="mismatchList" class="list-disc pl-5 text-sm"></ul>
     </section>
 
-    <section id="unscheduledSection" class="mt-4 hidden bg-orange-50 p-3 rounded border border-orange-200">
+    <section id="unscheduledSection" class="mt-4 hidden bg-orange-50 p-3 rounded border border-orange-200 text-gray-900">
       <h2 class="font-semibold mb-2">Belum isi form preferensi</h2>
       <ul id="unscheduledList" class="list-disc pl-5 text-sm"></ul>
     </section>
