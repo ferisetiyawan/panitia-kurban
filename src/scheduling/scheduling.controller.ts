@@ -9,6 +9,7 @@ import {
   Query,
   UseGuards,
   BadRequestException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -16,11 +17,15 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
 import { SchedulingService } from './scheduling.service';
 import type { Team } from './scheduling.service';
+import { SchedulingBroadcastService, BroadcastTarget } from './scheduling-broadcast.service';
 
 @Controller('api/scheduling')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 export class SchedulingController {
-  constructor(private readonly service: SchedulingService) {}
+  constructor(
+    private readonly service: SchedulingService,
+    private readonly broadcast: SchedulingBroadcastService,
+  ) {}
 
   @Get()
   @Roles(Role.SUPER_ADMIN, Role.KETUA_PANITIA, Role.PANITIA_VOUCHER, Role.PANITIA_SCANNER)
@@ -59,5 +64,28 @@ export class SchedulingController {
   async clear(@Body() body: { eventId: string }) {
     if (!body?.eventId) throw new BadRequestException('eventId required');
     return this.service.clearSchedule(body.eventId);
+  }
+
+  @Post('broadcast')
+  @Roles(Role.SUPER_ADMIN, Role.KETUA_PANITIA)
+  async sendBroadcast(
+    @Body() body: { eventId: string; target: BroadcastTarget; dryRun?: boolean },
+  ) {
+    if (!body?.eventId || !body?.target) {
+      throw new BadRequestException('eventId + target required');
+    }
+    const jid = this.broadcast.resolveGroupJid(body.target);
+    if (!jid) {
+      throw new ServiceUnavailableException(`Grup ${body.target} belum dikonfigurasi (env)`);
+    }
+    const message =
+      body.target === 'sohibul_group'
+        ? await this.broadcast.buildSohibulMessage(body.eventId)
+        : await this.broadcast.buildPanitiaMessage(body.eventId, {});
+    if (body.dryRun) {
+      return { sent: false, preview: message, group_jid: jid };
+    }
+    await this.broadcast.sendToGroup(jid, message);
+    return { sent: true, group_jid: jid };
   }
 }

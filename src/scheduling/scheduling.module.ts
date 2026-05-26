@@ -6,6 +6,7 @@ import { FormResponse } from '../form-responses/form-response.entity';
 import { Event } from '../events/event.entity';
 import { NotificationsModule } from '../common/notifications/notifications.module';
 import { SchedulingService } from './scheduling.service';
+import { SchedulingBroadcastService } from './scheduling-broadcast.service';
 import { SchedulingController } from './scheduling.controller';
 import { SchedulingPortalController } from './scheduling.portal.controller';
 
@@ -14,7 +15,7 @@ import { SchedulingPortalController } from './scheduling.portal.controller';
     TypeOrmModule.forFeature([Animal, Pengkurban, FormResponse, Event]),
     NotificationsModule,
   ],
-  providers: [SchedulingService],
+  providers: [SchedulingService, SchedulingBroadcastService],
   controllers: [SchedulingController, SchedulingPortalController],
   exports: [SchedulingService],
 })
