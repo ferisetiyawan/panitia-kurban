@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jadwal Penyembelihan - Panitia Kurban</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="bg-orb bg-orb-1"></div>
+  <div class="bg-orb bg-orb-2"></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <h1>🕌 Al Hijrah CGE</h1>
+      <p>Sistem Panitia Kurban</p>
+    </div>
+    <nav class="sidebar-nav"></nav>
+  </aside>
+  <nav class="bottom-nav" id="bottom-nav">
+    <div class="bottom-nav-items"></div>
+  </nav>
+
+  <main class="main-content">
+    <div class="top-bar">
+      <div class="flex items-center gap-3">
+        <button class="hamburger" onclick="toggleSidebar()">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+          </svg>
+        </button>
+        <h2 class="page-title">Jadwal Penyembelihan</h2>
+      </div>
+      <div id="user-info" class="user-info"></div>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3 mb-4">
+      <select id="eventSelect" class="border rounded p-2 bg-white"></select>
+      <button id="btnGenerate" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">⚙️ Generate Ulang</button>
+      <button id="btnPdf" class="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded">📥 Export PDF</button>
+      <div class="relative inline-block">
+        <button id="btnBroadcast" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">📢 Broadcast WA ▾</button>
+        <div id="broadcastMenu" class="hidden absolute bg-white shadow-lg border rounded mt-1 right-0 z-10 min-w-[200px]">
+          <button data-target="sohibul_group" class="block px-4 py-2 hover:bg-gray-100 w-full text-left">Post ke grup sohibul</button>
+          <button data-target="panitia_group" class="block px-4 py-2 hover:bg-gray-100 w-full text-left">Post ke grup panitia</button>
+        </div>
+      </div>
+      <button id="btnRefresh" class="bg-blue-100 hover:bg-blue-200 px-4 py-2 rounded">🔄 Refresh</button>
+    </div>
+
+    <div id="summary" class="mb-4 text-sm text-gray-600"></div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <section class="bg-white p-3 rounded shadow-sm border">
+        <h2 class="font-semibold mb-2">Tim SAPI</h2>
+        <table class="w-full border-collapse" id="tableSapi">
+          <thead><tr class="bg-gray-100"><th class="text-left p-2">Jam</th><th class="text-left p-2">Sohibul / Hewan</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </section>
+      <section class="bg-white p-3 rounded shadow-sm border">
+        <h2 class="font-semibold mb-2">Tim KAMBING/DOMBA</h2>
+        <table class="w-full border-collapse" id="tableKambing">
+          <thead><tr class="bg-gray-100"><th class="text-left p-2">Jam</th><th class="text-left p-2">Sohibul / Hewan</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </section>
+    </div>
+
+    <section id="mismatchSection" class="mt-6 hidden bg-yellow-50 p-3 rounded border border-yellow-200">
+      <h2 class="font-semibold mb-2">⚠️ Mismatches</h2>
+      <ul id="mismatchList" class="list-disc pl-5 text-sm"></ul>
+    </section>
+
+    <section id="unscheduledSection" class="mt-4 hidden bg-orange-50 p-3 rounded border border-orange-200">
+      <h2 class="font-semibold mb-2">Belum isi form preferensi</h2>
+      <ul id="unscheduledList" class="list-disc pl-5 text-sm"></ul>
+    </section>
+  </main>
+
+  <script src="/js/app.js"></script>
+  <script>
+    (async () => {
+      const $ = (s) => document.querySelector(s);
+      let currentEventId = null;
+
+      function fmtTime(iso) {
+        if (!iso) return '—';
+        const d = new Date(iso);
+        return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+      }
+      function esc(s) {
+        return String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+      }
+
+      async function loadEvents() {
+        const events = await api('/events');
+        const sel = $('#eventSelect');
+        sel.innerHTML = events.map((e) =>
+          `<option value="${esc(e.id)}">${esc(e.hijriYear ?? e.name ?? e.id)}</option>`
+        ).join('');
+        currentEventId = events[0]?.id;
+        sel.onchange = () => { currentEventId = sel.value; refresh(); };
+      }
+
+      function rowHtml(it) {
+        const names = it.pengkurban.map((p) => p.name).filter(Boolean);
+        const label = names.length > 1 ? `${esc(names[0])} (+${names.length - 1} kolektif)` : esc(names[0] ?? '(vendor)');
+        return `<tr class="border-b">
+          <td class="p-2 font-mono">${fmtTime(it.animal.scheduledAt)}</td>
+          <td class="p-2">
+            <button class="text-blue-700 hover:underline" data-animal-id="${esc(it.animal.id)}">${label}</button>
+            <br><span class="text-xs text-gray-500">${esc(it.animal.animalCode)}</span>
+          </td>
+        </tr>`;
+      }
+
+      async function refresh() {
+        if (!currentEventId) return;
+        try {
+          const items = await api(`/scheduling?eventId=${encodeURIComponent(currentEventId)}`);
+          const sapi = items.filter((i) => i.animal.scheduledTeam === 'SAPI');
+          const kambing = items.filter((i) => i.animal.scheduledTeam === 'KAMBING_DOMBA');
+          $('#tableSapi tbody').innerHTML = sapi.length ? sapi.map(rowHtml).join('') : '<tr><td colspan="2" class="p-2 text-gray-400">Belum ada jadwal</td></tr>';
+          $('#tableKambing tbody').innerHTML = kambing.length ? kambing.map(rowHtml).join('') : '<tr><td colspan="2" class="p-2 text-gray-400">Belum ada jadwal</td></tr>';
+          document.querySelectorAll('[data-animal-id]').forEach((btn) => {
+            btn.onclick = () => openEditModal(btn.dataset.animalId, items.find((i) => i.animal.id === btn.dataset.animalId));
+          });
+        } catch (e) {
+          alert('Gagal load jadwal: ' + (e.message || e));
+        }
+      }
+
+      async function openEditModal(animalId, item) {
+        const currentTime = fmtTime(item.animal.scheduledAt);
+        const newTime = prompt(`Jam baru untuk ${item.animal.animalCode} (HH:MM, kosong = hapus jadwal):`, currentTime);
+        if (newTime === null) return;
+        const newTeam = prompt('Tim (SAPI / KAMBING_DOMBA):', item.animal.scheduledTeam || '');
+        if (newTeam === null) return;
+        let scheduledAt = null;
+        if (newTime.trim()) {
+          const parts = newTime.split(':').map(Number);
+          if (parts.length !== 2 || isNaN(parts[0]) || isNaN(parts[1])) {
+            alert('Format jam invalid. Pakai HH:MM.');
+            return;
+          }
+          const d = new Date(item.animal.scheduledAt || Date.now());
+          d.setHours(parts[0], parts[1], 0, 0);
+          scheduledAt = d.toISOString();
+        }
+        try {
+          await api(`/scheduling/${encodeURIComponent(animalId)}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ scheduledAt, scheduledTeam: newTeam || null }),
+          });
+          refresh();
+        } catch (e) {
+          alert('Gagal update: ' + (e.message || e));
+        }
+      }
+
+      $('#btnRefresh').onclick = refresh;
+
+      $('#btnGenerate').onclick = async () => {
+        if (!currentEventId) return;
+        if (!confirm('Generate ulang akan OVERWRITE jadwal existing. Lanjut?')) return;
+        try {
+          const summary = await api('/scheduling/generate', {
+            method: 'POST',
+            body: JSON.stringify({ eventId: currentEventId }),
+          });
+          const s = summary.teams.SAPI;
+          const k = summary.teams.KAMBING_DOMBA;
+          $('#summary').textContent =
+            `SAPI ${s.total} (${s.firstSlot ?? '-'}–${s.lastSlot ?? '-'}, overflow ${s.overflow}) • ` +
+            `KAMBING/DOMBA ${k.total} (${k.firstSlot ?? '-'}–${k.lastSlot ?? '-'}, overflow ${k.overflow})`;
+          if (summary.mismatches?.length) {
+            $('#mismatchSection').classList.remove('hidden');
+            $('#mismatchList').innerHTML = summary.mismatches.map((m) =>
+              `<li>${esc(m.pengkurbanName)} (${esc(m.animalCode)}) — preferensi ${esc(m.preferred)}, dijadwalkan ${esc(m.scheduled)}: ${esc(m.reason)}</li>`
+            ).join('');
+          } else {
+            $('#mismatchSection').classList.add('hidden');
+          }
+          if (summary.unscheduledWithoutPreferensi?.length) {
+            $('#unscheduledSection').classList.remove('hidden');
+            $('#unscheduledList').innerHTML = summary.unscheduledWithoutPreferensi.map((u) =>
+              `<li>${esc(u.pengkurbanName)} (${esc(u.animalCode)})</li>`
+            ).join('');
+          } else {
+            $('#unscheduledSection').classList.add('hidden');
+          }
+          refresh();
+        } catch (e) {
+          alert('Generate gagal: ' + (e.message || e));
+        }
+      };
+
+      $('#btnPdf').onclick = () => {
+        if (!currentEventId) return;
+        window.open(`/api/scheduling/pdf?eventId=${encodeURIComponent(currentEventId)}`, '_blank');
+      };
+
+      $('#btnBroadcast').onclick = (e) => {
+        e.stopPropagation();
+        $('#broadcastMenu').classList.toggle('hidden');
+      };
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('#btnBroadcast') && !e.target.closest('#broadcastMenu')) {
+          $('#broadcastMenu').classList.add('hidden');
+        }
+      });
+      $('#broadcastMenu').querySelectorAll('[data-target]').forEach((btn) => {
+        btn.onclick = async () => {
+          $('#broadcastMenu').classList.add('hidden');
+          if (!currentEventId) return;
+          try {
+            const preview = await api('/scheduling/broadcast', {
+              method: 'POST',
+              body: JSON.stringify({ eventId: currentEventId, target: btn.dataset.target, dryRun: true }),
+            });
+            if (confirm(`Preview ke ${preview.group_jid}:\n\n${preview.preview}\n\nKirim sekarang?`)) {
+              await api('/scheduling/broadcast', {
+                method: 'POST',
+                body: JSON.stringify({ eventId: currentEventId, target: btn.dataset.target }),
+              });
+              alert('Sent ✓');
+            }
+          } catch (e) {
+            alert('Broadcast gagal: ' + (e.message || e));
+          }
+        };
+      });
+
+      await loadEvents();
+      await refresh();
+    })();
+  </script>
+</body>
+</html>
