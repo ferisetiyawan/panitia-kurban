@@ -143,6 +143,8 @@
         }
       };
 
+      if (!requireAuth()) return;
+      initSidebar('seset');
       await loadEvents();
       await refresh();
     })();
